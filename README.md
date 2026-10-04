@@ -100,6 +100,15 @@ Created on first run. **Disable them in Administration before any real use.**
 | Auditor | `auditor` / `audit@123` | Audit log | read-only: audit trail, tamper check, exports |
 | Administrator | `admin` / `admin@123` | Administration | add or disable users, sign-in history, data status; cannot decide links |
 
+### Languages and phones
+- **English, हिन्दी, தமிழ்**: pick from the menu on the sign-in page or the top bar; the choice is remembered. The whole
+  officer workflow (sign-in, menus, review queue, map, hand checks, uploads, changes) and every heading, status and
+  button is translated, including text the pages create as you work. Long explanatory paragraphs on the analyst pages
+  are still English. Translations are a first draft and should be checked by native speakers before official use;
+  they live in one file, `ui/assets/i18n.js`, so adding a language (Marathi, Bengali, Telugu…) means adding one column.
+- **Phones and tablets**: every page fits a 390 px screen with no sideways scrolling; the menu becomes a swipeable row,
+  maps come first where they matter, and form fields don't trigger zoom on iOS.
+
 ### A five-minute demo
 1. Sign in as **supervisor**. The **Dashboard** shows the synthetic benchmark and every module's numbers.
 2. **Review queue → Real: OSM ↔ Microsoft.** Pick a pair: map, evidence, why the model says so. Tick
@@ -197,6 +206,8 @@ Dockerfile, docker-compose.yml
 | Changes | real 2016 → 2023, or the synthetic later survey with exact scores |
 | Real data | three real maps compared, offset removal, hand checks, accuracy, encroachment |
 | Match your data | upload two layers and link them |
+
+Every page works in English, Hindi and Tamil, and on phones.
 | Audit log | full decision history, tamper check, CSV / JSONL download |
 | Methodology | pipeline, real and synthetic test results, settings, limits |
 | Administration | users, sign-in history, data status |

@@ -87,7 +87,7 @@ async function renderNav(active) {
   who.append(el("b", "", me.name), el("span", `role-chip role-${me.role}`, me.role_label));
   const out = el("button", "btn", "Sign out");
   out.addEventListener("click", async () => { await fetch("/api/logout", { method: "POST" }); location.href = pageUrl("login.html"); });
-  right.append(who, out);
+  right.append(typeof langPicker === "function" ? langPicker(true) : "", who, out);
   h.append(brand, nav, right);
   // pending-review badge on the Review link
   if (me.pages.includes("review.html")) Promise.all([j("/api/pairs?bucket=review"), j("/api/decisions")]).then(([rev, log]) => {

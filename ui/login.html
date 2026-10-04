@@ -17,12 +17,13 @@
   .err { color: var(--bad); font-size: 13px; min-height: 18px; }
   .roles table.data td { vertical-align: middle; }
   .roles .about { color: var(--muted); font-size: 12px; }
+  @media (max-width: 760px) { .roles .about { display: none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="card">
-    <div class="brand-big"><b>Parcel Reconciliation Console</b><span>Cadastral ↔ revenue layers · SIH26013</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px"><div class="brand-big"><b>Parcel Reconciliation Console</b><span>Cadastral ↔ revenue layers · SIH26013</span></div><span id="langBox"></span></div>
     <form id="form" autocomplete="on">
       <label>Username <input type="text" id="username" name="username" autocomplete="username" required autofocus></label>
       <label>Password <input type="password" id="password" name="password" autocomplete="current-password" required></label>
@@ -37,9 +38,11 @@
     <table class="data" id="roles"></table>
   </div>
 </div>
+<script src="assets/i18n.js?v=9"></script>
 <script src="assets/common.js?v=9"></script>
 <script>
 "use strict";
+if (typeof langPicker === "function") document.getElementById("langBox").append(langPicker());
 const DEMO = [
   ["officer", "officer1", "officer@123"], ["supervisor", "supervisor", "super@123"],
   ["auditor", "auditor", "audit@123"], ["admin", "admin", "admin@123"],

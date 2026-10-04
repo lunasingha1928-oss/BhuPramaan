@@ -27,7 +27,7 @@
   #list li:hover { background: #faf9f6; } #list { padding: 0; margin: 8px 0 0; }
   .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eef4ea; color: #2c6b2c; white-space: nowrap; }
   .tag.warn { background: #fdf3dc; color: #7a5600; }
-  @media (max-width: 1000px) { body { display: block; } main { display: flex; flex-direction: column; } #mapwrap { height: 60vh; } }
+  @media (max-width: 1000px) { body { display: block; } main { display: flex; flex-direction: column; } #mapwrap { height: 50vh; order: -1; } aside { overflow: visible; } }
 </style>
 </head>
 <body>
@@ -46,6 +46,7 @@
   <section id="mapwrap" aria-label="Map of changes"><div id="map"></div></section>
 </main>
 <script src="vendor/leaflet.js"></script>
+<script src="assets/i18n.js?v=9"></script>
 <script src="assets/common.js?v=9"></script>
 <script>
 "use strict";
