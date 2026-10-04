@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Match your data · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  form { display: grid; gap: 12px; }
+  .drop { border: 1.5px dashed var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; background: #fbfaf7; }
+  .drop.over { border-color: var(--accent); background: #eef6f3; }
+  .drop b { font-size: 13px; } .drop .file { font-size: 12px; color: var(--muted); word-break: break-all; }
+  .drop input[type=text] { width: 100%; padding: 6px 9px; }
+  .row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  #mapwrap { position: relative; height: 560px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+  #map { position: absolute; inset: 0; background: #ece9e0; }
+  .layers { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin-bottom: 10px; }
+  .layers label { display: inline-flex; gap: 6px; align-items: center; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .legend span { display: inline-flex; gap: 6px; align-items: center; }
+  #links { max-height: 420px; overflow: auto; }
+  #links tr { cursor: pointer; } #links tr:hover td { background: #faf9f6; }
+  .busy { display: none; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .busy.on { display: flex; }
+  .spin { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .err { color: var(--bad); font-size: 13px; }
+  #recent li { list-style: none; padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  #recent { padding: 0; margin: 0; }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>Match your own layers</h1>
+      <p>Upload two maps of the same area (for example a cadastral layer and a municipal or building layer). The system removes the
+         offset between them, links the matching shapes and shows what it could and couldn't link. Nothing is changed in your files.</p></div>
+  </div>
+
+  <div class="grid g-12">
+    <div class="card s-4">
+      <h2>Upload</h2>
+      <p class="sub">GeoJSON, GeoPackage, or a zipped Shapefile. Up to 25 MB and 20,000 shapes per layer.</p>
+      <form id="form">
+        <div class="drop" id="dropA"><b>Layer A (reference)</b>
+          <input type="file" id="fileA" accept=".geojson,.json,.gpkg,.zip" required>
+          <input type="text" id="nameA" value="Layer A" maxlength="40" aria-label="Name for layer A"></div>
+        <div class="drop" id="dropB"><b>Layer B (to compare)</b>
+          <input type="file" id="fileB" accept=".geojson,.json,.gpkg,.zip" required>
+          <input type="text" id="nameB" value="Layer B" maxlength="40" aria-label="Name for layer B"></div>
+        <label class="row"><input type="checkbox" id="coreg" checked> Remove the offset between the layers first (co-registration)</label>
+        <button class="btn primary" id="go" type="submit">Match the layers</button>
+        <div class="busy" id="busy"><i class="spin"></i><span>Reading, aligning and matching…</span></div>
+        <div class="err" id="err" role="alert"></div>
+      </form>
+      <p class="hint" style="margin-top:12px">To try it: upload <code>data/ward.geojson</code> as A and <code>data/real/microsoft_buildings.geojson</code> as B.</p>
+      <h2 style="margin-top:16px">Recent uploads</h2>
+      <ul id="recent"></ul>
+    </div>
+
+    <div class="card s-8" id="resultCard">
+      <h2 id="resTitle">Result</h2>
+      <p class="sub" id="resSub">Upload two layers to see the result here.</p>
+      <div class="tiles" id="tiles"></div>
+      <div class="layers" id="layerCtl"></div>
+      <div id="mapwrap"><div id="map"></div></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="card s-12">
+      <h2>Links found</h2>
+      <p class="sub" id="linksSub">Auto-linked and needs-review pairs, most confident first. Click a row to see it on the map.</p>
+      <div id="dl" style="margin-bottom:8px"></div>
+      <div id="links"></div>
+    </div>
+  </div>
+</div>
+<script src="vendor/leaflet.js"></script>
+<script src="assets/common.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("upload.html");
+const ST = {
+  matched: { label: "Linked", color: "#0ca30c" },
+  review: { label: "Needs review", color: "#fab219" },
+  part_of_larger: { label: "Part of a larger shape", color: "#2a78d6" },
+  covers_several: { label: "Covers several shapes", color: "#86b6ef" },
+  unmatched: { label: "No counterpart", color: "#9a988f" },
+};
+const U = { map: null, groups: [], hi: null, idx: {}, res: null };
+
+function tile(label, value, note) { const d = el("div", "card tile"); d.append(el("div", "label", label), el("div", "value", value)); if (note) d.append(el("div", "note", note)); return d; }
+
+function ensureMap() {
+  if (U.map) return;
+  U.map = L.map("map", { preferCanvas: true, zoomSnap: 0.25 });
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 20, maxNativeZoom: 19, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }).addTo(U.map);
+}
+
+function show(res) {
+  U.res = res; ensureMap();
+  for (const g of U.groups) U.map.removeLayer(g);
+  U.groups = []; if (U.hi) { U.map.removeLayer(U.hi); U.hi = null; }
+  const s = res.summary, cr = res.coregistration, n = res.names;
+  $("resTitle").textContent = `${n.a} ↔ ${n.b}`;
+  $("resSub").textContent = `Uploaded ${new Date(res.created).toLocaleString()} by ${res.user} · ${res.crs}.`;
+  $("tiles").textContent = "";
+  $("tiles").append(
+    tile("Shapes", `${fmtInt(s.n_a)} / ${fmtInt(s.n_b)}`, `${n.a} / ${n.b}`),
+    tile("Linked automatically", fmtInt(s.auto_links), Object.entries(res.why || {}).map(([k, v]) => `${v} by ${k}`).join(" · ")),
+    tile("Sent to review", fmtInt(s.review_links), "an officer decides"),
+    tile(`${n.a} found in ${n.b}`, pct(s.a_with_counterpart, 0), `${fmtInt(s.a_only)} with no counterpart`),
+    cr && cr.applied
+      ? tile("Offset removed", `${cr.anchor_offset_median_m.before.toFixed(1)} → ${cr.anchor_offset_median_m.after.toFixed(1)} m`, `from ${fmtInt(cr.anchors)} anchor shapes`)
+      : tile("Offset removed", "—", cr && cr.anchors !== undefined ? "too few clear pairs to estimate" : "co-registration switched off"));
+  // map
+  const style = (dash) => (f) => ({ color: ST[f.properties.status].color, weight: 1.6, dashArray: dash, fillColor: ST[f.properties.status].color, fillOpacity: 0.18 });
+  const tip = (lab) => (f, l) => l.bindTooltip(`${lab} ${f.properties.id}: ${ST[f.properties.status].label}`);
+  const A = L.geoJSON(res.layers.A, { style: style(null), onEachFeature: tip(n.a) });
+  const Braw = L.geoJSON(res.layers.B, { style: style("5 3"), onEachFeature: tip(n.b) });
+  const Bfix = L.geoJSON(res.layers.B_aligned, { style: style("5 3"), onEachFeature: tip(n.b) });
+  U.idx = { A: new Map(res.layers.A.features.map((f) => [f.properties.id, f])), B: new Map(res.layers.B_aligned.features.map((f) => [f.properties.id, f])) };
+  const gB = L.featureGroup([cr && cr.applied ? Bfix : Braw]);
+  A.addTo(U.map); gB.addTo(U.map); U.groups.push(A, gB);
+  const ctl = $("layerCtl"); ctl.textContent = "";
+  const toggle = (label, on, fn) => { const l = el("label"); const c = el("input"); c.type = "checkbox"; c.checked = on; c.addEventListener("change", () => fn(c.checked)); l.append(c, document.createTextNode(label)); ctl.append(l); };
+  toggle(`${n.a} (solid)`, true, (on) => (on ? A.addTo(U.map) : U.map.removeLayer(A)));
+  toggle(`${n.b} (dashed)`, true, (on) => (on ? gB.addTo(U.map) : U.map.removeLayer(gB)));
+  if (cr && cr.applied) toggle("Offset removed", true, (on) => { gB.clearLayers(); gB.addLayer(on ? Bfix : Braw); });
+  U.map.fitBounds(A.getBounds().pad(0.03));
+  $("legend").textContent = "";
+  for (const k of Object.keys(ST)) { const sp = el("span"); const d = el("i", "dot"); d.style.background = ST[k].color; sp.append(d, document.createTextNode(ST[k].label)); $("legend").append(sp); }
+  // links table
+  $("dl").textContent = "";
+  const a = el("a", "btn", "Download links (CSV)"); a.href = `/api/upload/${res.job}/links.csv`; $("dl").append(a);
+  $("linksSub").textContent = `${fmtInt(res.links.length)} pairs (auto-linked and needs review), most confident first. Auto-link rule: model ≥ ${pct(res.thresholds.accept, 0)} or overlap (IoU) ≥ ${res.thresholds.iou_accept}. ${res.note}`;
+  const t = el("table", "data");
+  const hr = el("tr"); for (const h of [n.a, n.b, "Model", "Overlap (IoU)", "Offset", "Result", "Linked by"]) hr.append(el("th", ["Model", "Overlap (IoU)", "Offset"].includes(h) ? "num" : "", h)); t.append(hr);
+  for (const r of res.links.slice(0, 500)) {
+    const tr = el("tr"); tr.tabIndex = 0;
+    tr.append(el("td", "mono", r.a), el("td", "mono", r.b), el("td", "num", pct(r.p, 0)), el("td", "num", r.iou.toFixed(2)),
+      el("td", "num", r.offset_m.toFixed(1) + " m"), el("td", "", r.bucket === "accept" ? "Linked" : "Needs review"), el("td", "", r.why || "—"));
+    const go = () => { const fa = U.idx.A.get(r.a), fb = U.idx.B.get(r.b); if (U.hi) U.map.removeLayer(U.hi);
+      U.hi = L.featureGroup([L.geoJSON(fa, { style: { color: "#1b2330", weight: 3, fillOpacity: 0 } }), L.geoJSON(fb, { style: { color: "#d03b3b", weight: 3, dashArray: "6 4", fillOpacity: 0 } })]).addTo(U.map);
+      U.map.fitBounds(U.hi.getBounds().pad(2), { maxZoom: 20 }); $("resultCard").scrollIntoView({ behavior: "smooth", block: "start" }); };
+    tr.addEventListener("click", go); tr.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+    t.append(tr);
+  }
+  $("links").textContent = "";
+  $("links").append(res.links.length ? t : el("div", "empty", "No links found. Check that both layers show the same kind of shapes for the same area."));
+}
+
+async function loadRecent() {
+  const list = await j("/api/uploads"); const ul = $("recent"); ul.textContent = "";
+  if (!list.length) { ul.append(el("li", "hint", "None yet.")); return; }
+  for (const r of list.slice(0, 8)) {
+    const li = el("li"); li.tabIndex = 0;
+    li.append(el("span", "", `${r.names.a} ↔ ${r.names.b}`), el("span", "hint", `${r.auto_links} linked · ${new Date(r.created).toLocaleDateString()}`));
+    const open = async () => { try { show(await j(`/api/upload/${r.job}`)); } catch (e) { $("err").textContent = e.message; } };
+    li.addEventListener("click", open); li.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    ul.append(li);
+  }
+}
+
+function wireDrop(box, input) {
+  ["dragenter", "dragover"].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => box.addEventListener(t, (e) => { e.preventDefault(); box.classList.remove("over"); }));
+  box.addEventListener("drop", (e) => { if (e.dataTransfer.files.length) input.files = e.dataTransfer.files; });
+}
+
+async function init() {
+  wireDrop($("dropA"), $("fileA")); wireDrop($("dropB"), $("fileB"));
+  $("form").addEventListener("submit", async (e) => {
+    e.preventDefault(); $("err").textContent = "";
+    const fd = new FormData();
+    fd.append("layer_a", $("fileA").files[0]); fd.append("layer_b", $("fileB").files[0]);
+    fd.append("name_a", $("nameA").value); fd.append("name_b", $("nameB").value); fd.append("coregister", $("coreg").checked ? "true" : "false");
+    $("go").disabled = true; $("busy").classList.add("on");
+    try {
+      const r = await j("/api/upload", { method: "POST", body: fd });
+      show(await j(`/api/upload/${r.job}`)); await loadRecent();
+    } catch (err) { $("err").textContent = err.message; }
+    finally { $("go").disabled = false; $("busy").classList.remove("on"); }
+  });
+  await loadRecent();
+}
+ME.then(init);
+</script>
+</body>
+</html>

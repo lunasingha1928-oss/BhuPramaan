@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+results/*
+!results/.gitkeep
+.pytest_cache/
+demo/users.json
+demo/.secret
+demo/access.jsonl
+demo/uploads/
+demo/decisions.jsonl.bak
+
+# update bundles used during development
+*.zip
+_old_updates/

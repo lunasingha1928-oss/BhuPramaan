@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit log · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+  .controls .spacer { flex: 1; }
+  td.note { max-width: 320px; }
+  tr.superseded td { color: var(--faint); }
+  tr.superseded .tag { opacity: .6; }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>Audit log</h1>
+      <p>Every officer decision, in order. Entries are never edited or deleted: each one stores a hash of the entry before it,
+         so any change to past entries breaks the chain and shows up here.</p></div>
+  </div>
+  <div id="banner" class="banner info">Checking the hash chain…</div>
+  <div class="controls">
+    <input type="search" id="q" placeholder="Search parcel, officer or note" aria-label="Search the log">
+    <select id="decision" aria-label="Filter by decision"><option value="">All decisions</option><option value="accept">Accepted</option><option value="reject">Rejected</option></select>
+    <label class="hint"><input type="checkbox" id="history" checked> Show changed decisions</label>
+    <span class="spacer"></span>
+    <button class="btn" id="dlCsv">Download CSV</button>
+    <button class="btn" id="dlJsonl">Download raw log (.jsonl)</button>
+  </div>
+  <div class="card" style="padding:0;overflow:auto">
+    <table class="data" id="table"></table>
+  </div>
+  <p class="hint" id="count"></p>
+</div>
+<script src="assets/common.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("audit.html");
+let LOG = [], USER = null;
+
+const ROLE_LABEL = { officer: "Revenue officer", supervisor: "Supervisor", auditor: "Auditor", admin: "Administrator" };
+function whoCell(d) {
+  const td = el("td", "", d.officer);
+  if (d.role) td.append(el("div", "hint", ROLE_LABEL[d.role] || d.role));
+  return td;
+}
+function render() {
+  const q = $("q").value.trim().toLowerCase(), dec = $("decision").value, hist = $("history").checked;
+  const latest = latestDecisions(LOG);
+  const current = new Set([...latest.values()].map((d) => d.seq));
+  const rows = [...LOG].reverse().filter((d) =>
+    (!dec || d.decision === dec) && (hist || current.has(d.seq)) &&
+    (!q || [d.a_id, d.b_id, d.officer, d.note].join(" ").toLowerCase().includes(q)));
+  const t = $("table"); t.textContent = "";
+  const hr = el("tr");
+  for (const h of ["#", "Time", "Link", "Decision", "Decided by", "Note", "Model", "Replaces", "Hash"])
+    hr.append(el("th", h === "#" || h === "Model" ? "num" : "", h));
+  t.append(hr);
+  if (!rows.length) {
+    const tr = el("tr"); const td = el("td", "empty", LOG.length ? "No entries match these filters." : "No decisions yet. Decisions made in the review queue appear here.");
+    td.colSpan = 9; tr.append(td); t.append(tr);
+  }
+  for (const d of rows) {
+    const tr = el("tr", current.has(d.seq) ? "" : "superseded");
+    const canReview = USER && USER.pages.includes("review.html");
+    const link = el(canReview ? "a" : "span", "mono", `${d.a_id} ↔ ${d.b_id}`);
+    if (canReview) link.href = "review.html#" + key(d.a_id, d.b_id);
+    const tdLink = el("td"); tdLink.append(link);
+    const tdDec = el("td"); tdDec.append(el("span", `tag ${d.decision}`, d.decision === "accept" ? "Accepted" : "Rejected"));
+    if (!current.has(d.seq)) tdDec.append(el("div", "hint", "changed later"));
+    const hash = el("td", "mono", d.hash.slice(0, 12) + "…"); hash.title = d.hash;
+    tr.append(el("td", "num", String(d.seq)), el("td", "", new Date(d.ts).toLocaleString()), tdLink, tdDec,
+      whoCell(d), el("td", "note", d.note || "—"), el("td", "num", pct(d.model_p, 0)),
+      el("td", "", d.supersedes ? "#" + d.supersedes : "—"), hash);
+    t.append(tr);
+  }
+  $("count").textContent = `${rows.length} of ${LOG.length} entries shown · ${latest.size} link${latest.size === 1 ? "" : "s"} decided`;
+}
+
+function csvCell(v) { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+
+async function init(me) {
+  USER = me;
+  try {
+    const [log, v] = await Promise.all([j("/api/decisions"), j("/api/verify")]);
+    LOG = log;
+    const b = $("banner");
+    b.className = "banner " + (v.valid ? "ok" : "bad");
+    b.textContent = v.valid
+      ? `Hash chain verified: ${v.entries} entries, none altered or removed.` + (v.head ? ` Latest hash ${v.head.slice(0, 16)}…` : "")
+      : `Tampering detected: entry #${v.first_bad_seq} does not match the chain. Entries from there on cannot be trusted.`;
+    render();
+  } catch (e) { fatal($("page"), e); }
+}
+for (const id of ["q", "decision", "history"]) $(id).addEventListener("input", render);
+$("dlJsonl").addEventListener("click", () => download("decisions.jsonl", LOG.map((d) => JSON.stringify(d)).join("\n") + "\n", "application/x-ndjson"));
+$("dlCsv").addEventListener("click", () => {
+  const cols = ["seq", "ts", "a_id", "b_id", "decision", "officer", "note", "model_p", "model_bucket", "supersedes", "prev", "hash"];
+  download("decisions.csv", [cols.join(","), ...LOG.map((d) => cols.map((c) => csvCell(d[c])).join(","))].join("\n") + "\n", "text/csv");
+});
+ME.then(init);
+</script>
+</body>
+</html>

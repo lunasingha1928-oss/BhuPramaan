@@ -1,0 +1,98 @@
+/* Shared look for every page of the console. Light theme, government-console tone. */
+:root {
+  --bg: #f3f2ee; --panel: #ffffff; --ink: #1b2330; --muted: #5f6673; --faint: #8b909a; --line: #dedbd2; --line-soft: #efede7;
+  --accent: #0f5c55; --accent-ink: #ffffff; --link: #1f4fd8;
+  /* data colours (validated reference palette): model = series 1 (blue), baseline = series 2 (orange) */
+  --series-model: #2a78d6; --series-base: #eb6834;
+  /* status palette: always paired with a text label */
+  --good: #1b8a3a; --warn: #c98500; --st-auto: #0ca30c; --st-review: #fab219; --st-unmatched: #9a988f; --bad: #d03b3b;
+  --radius: 10px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+a { color: var(--link); }
+button { font: inherit; cursor: pointer; }
+
+/* ---------- top bar ---------- */
+#topbar { display: flex; align-items: center; gap: 20px; padding: 0 18px; background: var(--panel); border-bottom: 1px solid var(--line);
+          min-height: 54px; flex-wrap: wrap; position: sticky; top: 0; z-index: 1000; }
+.brand { display: flex; flex-direction: column; padding: 8px 0; flex: none; }
+.brand b { font-size: 15px; } .brand span { font-size: 11px; color: var(--muted); }
+nav.pages { display: flex; gap: 0; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+nav.pages::-webkit-scrollbar { display: none; }
+nav.pages a { text-decoration: none; color: var(--muted); padding: 16px 10px 14px; white-space: nowrap; font-size: 13.5px; border-bottom: 2px solid transparent; font-weight: 500; }
+nav.pages a:hover { color: var(--ink); }
+nav.pages a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav.pages a .count { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 99px; background: #fbefd5; color: #7a4f00; font-size: 11px; font-weight: 700; }
+#topbar-right { flex: none; display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); }
+.who { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.who b { color: var(--ink); font-size: 13px; }
+.role-chip { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; margin-top: 2px; }
+.role-officer { background: #e4e8f5; color: #2b4a99; } .role-supervisor { background: #dff0ee; color: #0f5c55; }
+.role-auditor { background: #f3e8d6; color: #7a4f00; } .role-admin { background: #ece4f5; color: #55308c; }
+
+/* ---------- layout ---------- */
+.page { max-width: 1320px; margin: 0 auto; padding: 18px; }
+.page-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin: 4px 0 16px; flex-wrap: wrap; }
+.page-head h1 { margin: 0; font-size: 22px; } .page-head p { margin: 4px 0 0; color: var(--muted); max-width: 720px; }
+.grid { display: grid; gap: 14px; }
+.g-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.s-3 { grid-column: span 3; } .s-4 { grid-column: span 4; } .s-5 { grid-column: span 5; } .s-6 { grid-column: span 6; }
+.s-7 { grid-column: span 7; } .s-8 { grid-column: span 8; } .s-12 { grid-column: span 12; }
+@media (max-width: 1000px) { .g-12 > * { grid-column: span 12; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; min-width: 0; overflow-x: auto; }
+@media (max-width: 700px) { .page { padding: 12px; } .hero b { font-size: 44px; } #topbar { gap: 8px; } nav.pages a { padding: 10px 8px; } }
+.card h2 { margin: 0 0 2px; font-size: 14px; } .card .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+.card-foot { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* ---------- figures ---------- */
+.hero b { display: block; font-size: 56px; line-height: 1; font-weight: 650; letter-spacing: -.02em; }
+.hero span { display: block; margin-top: 8px; color: var(--muted); }
+.tile .label { font-size: 12px; color: var(--muted); }
+.tile .value { font-size: 28px; font-weight: 600; line-height: 1.15; margin-top: 4px; }
+.tile .note { font-size: 12px; color: var(--faint); margin-top: 2px; }
+
+/* ---------- common bits ---------- */
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; color: var(--ink); }
+a.btn { text-decoration: none; display: inline-block; }
+.btn:hover { border-color: #b9b5a8; } .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--bad); border-color: #e3b9b9; } .btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.tag { display: inline-flex; gap: 5px; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tag.review { background: #fbefd5; color: #7a4f00; } .tag.accept, .tag.auto { background: #dcf1dc; color: #1b6a1b; }
+.tag.reject { background: #f6dede; color: #8c2b2b; } .tag.unmatched { background: #ecebe7; color: #55534d; } .tag.done { background: #e4e8f5; color: #2b4a99; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+table.data { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.data th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.data td { padding: 7px 8px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.data tr:hover td { background: #faf9f6; }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+.muted { color: var(--muted); } .hint { color: var(--muted); font-size: 12px; }
+.empty { padding: 26px 16px; color: var(--muted); text-align: center; }
+.banner { padding: 10px 14px; border-radius: 8px; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.banner.ok { background: #dcf1dc; color: #1b6a1b; } .banner.bad { background: #f6dede; color: #8c2b2b; } .banner.info { background: #e8eefb; color: #23407f; }
+input[type=search], input[type=text], select { font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--panel); color: var(--ink); }
+details.tableview { margin-top: 8px; font-size: 12px; } details.tableview summary { cursor: pointer; color: var(--muted); }
+
+/* ---------- charts ---------- */
+.chart { width: 100%; position: relative; }
+.chart svg { display: block; overflow: visible; }
+.chart text { font: 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--muted); }
+.chart text.cat { fill: var(--ink); }
+.chart .grid line { stroke: #ebe9e2; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+#tip { position: fixed; z-index: 3000; pointer-events: none; background: #1b2330; color: #fff; font-size: 12px; padding: 6px 9px;
+       border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.18); display: none; max-width: 260px; line-height: 1.4; }
+#tip b { font-weight: 600; }
+.minimap { width: 100%; height: 300px; display: block; cursor: pointer; border-radius: 8px; background: #ece9e0; }
+.flow { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.flow .step { flex: 1 1 140px; background: #f7f6f2; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.flow .step b { display: block; font-size: 13px; } .flow .step span { font-size: 12px; color: var(--muted); }
+.flow .arrow { align-self: center; color: var(--faint); font-size: 18px; }
+.btn.primary kbd { color: var(--accent); background: #fff; }
+
+@media (max-width: 1500px) { .brand span { display: none; } nav.pages a { padding: 16px 8px 14px; font-size: 13px; } }

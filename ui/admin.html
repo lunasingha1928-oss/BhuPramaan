@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  form.new { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; align-items: end; }
+  @media (max-width: 900px) { form.new { grid-template-columns: 1fr 1fr; } }
+  form.new label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  form.new input, form.new select { width: 100%; }
+  .msg { font-size: 13px; min-height: 18px; margin-top: 8px; } .msg.err { color: var(--bad); } .msg.ok { color: var(--good); }
+  tr.off td { color: var(--faint); }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>Administration</h1>
+      <p>Manage who can sign in and check the data the console is serving. Administrators cannot decide links.</p></div>
+  </div>
+  <div class="grid g-12">
+    <div class="card s-12">
+      <h2>User accounts</h2>
+      <p class="sub">Disabling an account signs that person out at once. Passwords are stored as salted PBKDF2 hashes.</p>
+      <table class="data" id="users"></table>
+      <h2 style="margin-top:20px">Add a user</h2>
+      <form class="new" id="newUser">
+        <label>Username <input type="text" id="nu_username" required pattern="[a-z0-9._\-]{3,30}" placeholder="e.g. officer3"></label>
+        <label>Full name <input type="text" id="nu_name" required minlength="2"></label>
+        <label>Role <select id="nu_role"></select></label>
+        <label>Password <input type="text" id="nu_password" required minlength="8" placeholder="8+ characters"></label>
+        <button class="btn primary" type="submit">Add user</button>
+      </form>
+      <div class="msg" id="msg" role="status"></div>
+    </div>
+    <div class="card s-6">
+      <h2>Recent sign-ins and account changes</h2>
+      <p class="sub">Newest first. Failed sign-ins are listed too.</p>
+      <div style="max-height:360px;overflow:auto"><table class="data" id="access"></table></div>
+    </div>
+    <div class="card s-6">
+      <h2>Data and policy</h2>
+      <p class="sub">What the console is serving, and the thresholds from <span class="mono">config/policy.yaml</span>.</p>
+      <table class="data" id="files"></table>
+      <table class="data" id="policy" style="margin-top:14px"></table>
+      <p class="hint" style="margin-top:10px">To change thresholds, edit the policy file and rerun <span class="mono">scripts/build_demo.py</span>.</p>
+    </div>
+  </div>
+</div>
+<script src="assets/common.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("admin.html");
+let ROLES = {};
+
+function msg(text, ok) { const m = $("msg"); m.textContent = text; m.className = "msg " + (ok ? "ok" : "err"); }
+
+async function loadUsers(me) {
+  const users = await j("/api/admin/users");
+  const t = $("users"); t.textContent = "";
+  const hr = el("tr"); for (const h of ["Name", "Username", "Role", "Can see", "Status", "Created", ""]) hr.append(el("th", "", h)); t.append(hr);
+  users.sort((a, b) => Object.keys(ROLES).indexOf(a.role) - Object.keys(ROLES).indexOf(b.role) || a.username.localeCompare(b.username));
+  for (const u of users) {
+    const tr = el("tr", u.active ? "" : "off");
+    const role = el("td"); role.append(el("span", `role-chip role-${u.role}`, u.role_label));
+    const status = el("td"); status.append(el("span", `tag ${u.active ? "auto" : "unmatched"}`, u.active ? "Active" : "Disabled"));
+    const act = el("td");
+    if (u.username !== me.username) {
+      const b = el("button", "btn", u.active ? "Disable" : "Enable");
+      b.addEventListener("click", async () => {
+        try { await j(`/api/admin/users/${encodeURIComponent(u.username)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active: !u.active }) });
+              msg(`${u.name} ${u.active ? "disabled" : "enabled"}.`, true); loadUsers(me); loadAccess(); }
+        catch (e) { msg(e.message); }
+      });
+      act.append(b);
+    } else act.append(el("span", "hint", "you"));
+    const pages = u.pages.map((p) => (PAGES.find(([x]) => x === p) || [p, p])[1]).join(", ");
+    tr.append(el("td", "", u.name), el("td", "mono", u.username), role, el("td", "hint", pages), status,
+      el("td", "", u.created ? new Date(u.created).toLocaleDateString() : "—"), act);
+    t.append(tr);
+  }
+}
+
+async function loadAccess() {
+  const rows = await j("/api/admin/access");
+  const t = $("access"); t.textContent = "";
+  const hr = el("tr"); for (const h of ["Time", "User", "Event"]) hr.append(el("th", "", h)); t.append(hr);
+  if (!rows.length) { const tr = el("tr"); const td = el("td", "empty", "Nothing yet."); td.colSpan = 3; tr.append(td); t.append(tr); }
+  const label = (e) => e === "login" ? "Signed in" : e === "logout" ? "Signed out" : e === "login_failed" ? "Failed sign-in"
+    : e.replace("user_created:", "Created user ").replace("user_disabled:", "Disabled ").replace("user_enabled:", "Enabled ");
+  for (const r of rows) {
+    const tr = el("tr");
+    const ev = el("td"); ev.append(r.event === "login_failed" ? el("span", "tag reject", label(r.event)) : document.createTextNode(label(r.event)));
+    tr.append(el("td", "", new Date(r.ts).toLocaleString()), el("td", "mono", r.user), ev);
+    t.append(tr);
+  }
+}
+
+async function loadSystem() {
+  const s = await j("/api/admin/system");
+  const f = $("files"); f.textContent = "";
+  const hr = el("tr"); for (const h of ["Data file", "Status", "Updated", "Size"]) hr.append(el("th", h === "Size" ? "num" : "", h)); f.append(hr);
+  for (const [name, v] of Object.entries(s.files)) {
+    const tr = el("tr"); const st = el("td"); st.append(el("span", `tag ${v.present ? "auto" : "review"}`, v.present ? "Present" : "Missing"));
+    tr.append(el("td", "mono", name), st, el("td", "", v.updated ? new Date(v.updated).toLocaleString() : "—"),
+      el("td", "num", v.present ? (v.bytes / 1024).toFixed(0) + " KB" : "—"));
+    f.append(tr);
+  }
+  const p = s.policy, t = $("policy"); t.textContent = "";
+  if (!p) return;
+  for (const [k, v] of [["Target auto-accept precision", pct(p.ml.target_auto_precision, 0)], ["Candidate search radius", p.candidates.search_radius_m + " m"],
+                        ["Spatial block size", p.ml.block_size_m + " m"], ["Baseline IoU accept / review", `${p.baseline.accept_iou} / ${p.baseline.review_iou}`],
+                        ["Random seed", String(p.seed)]]) {
+    const tr = el("tr"); tr.append(el("td", "", k), el("td", "num", v)); t.append(tr);
+  }
+}
+
+ME.then(async (me) => {
+  try {
+    ROLES = await j("/api/roles");
+    for (const [k, v] of Object.entries(ROLES)) { const o = el("option", "", v.label); o.value = k; $("nu_role").append(o); }
+    await Promise.all([loadUsers(me), loadAccess(), loadSystem()]);
+  } catch (e) { fatal($("page"), e); }
+  $("newUser").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    try {
+      const u = await j("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: $("nu_username").value.trim().toLowerCase(), name: $("nu_name").value.trim(),
+                               role: $("nu_role").value, password: $("nu_password").value }) });
+      msg(`Added ${u.name} as ${u.role_label.toLowerCase()}.`, true);
+      ev.target.reset(); loadUsers(me); loadAccess();
+    } catch (e) { msg(e.message); }
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+{
+ "sources": {
+  "OSM": 1357,
+  "Microsoft": 1442,
+  "Google": 3133
+ },
+ "crs": "EPSG:32644",
+ "comparisons": [
+  {
+   "pair": "OSM \u2194 Microsoft",
+   "n_a": 1357,
+   "n_b": 1442,
+   "candidates": 14439,
+   "auto_links": 401,
+   "review_links": 343,
+   "a_with_counterpart": 0.7015475313190862,
+   "b_with_counterpart": 0.5894590846047156,
+   "a_only": 405,
+   "b_only": 592,
+   "one_to_one": 395,
+   "a_inside_larger_b": 157,
+   "b_polygons_covering_several_a": 31,
+   "b_inside_larger_a": 74,
+   "a_polygons_covering_several_b": 12,
+   "b_covering_several_a": 31,
+   "median_offset_m": 1.2706733937481403,
+   "p90_offset_m": 2.476642624289804,
+   "median_iou": 0.7547821742637296,
+   "median_area_ratio": 0.8892850885372198
+  },
+  {
+   "pair": "OSM \u2194 Google",
+   "n_a": 1357,
+   "n_b": 3133,
+   "candidates": 27594,
+   "auto_links": 287,
+   "review_links": 359,
+   "a_with_counterpart": 0.7184966838614592,
+   "b_with_counterpart": 0.4206830513884456,
+   "a_only": 382,
+   "b_only": 1815,
+   "one_to_one": 285,
+   "a_inside_larger_b": 53,
+   "b_polygons_covering_several_a": 6,
+   "b_inside_larger_a": 640,
+   "a_polygons_covering_several_b": 156,
+   "b_covering_several_a": 6,
+   "median_offset_m": 1.1830195678604656,
+   "p90_offset_m": 2.1151621708806707,
+   "median_iou": 0.7457245786894134,
+   "median_area_ratio": 0.8679341447442994
+  },
+  {
+   "pair": "Microsoft \u2194 Google",
+   "n_a": 1442,
+   "n_b": 3133,
+   "candidates": 28854,
+   "auto_links": 288,
+   "review_links": 346,
+   "a_with_counterpart": 0.7246879334257975,
+   "b_with_counterpart": 0.5352697095435685,
+   "a_only": 397,
+   "b_only": 1456,
+   "one_to_one": 288,
+   "a_inside_larger_b": 32,
+   "b_polygons_covering_several_a": 1,
+   "b_inside_larger_a": 1020,
+   "a_polygons_covering_several_b": 271,
+   "b_covering_several_a": 1,
+   "median_offset_m": 1.1330080018332924,
+   "p90_offset_m": 2.196925956903424,
+   "median_iou": 0.7488164523598119,
+   "median_area_ratio": 0.8981389358108607
+  }
+ ],
+ "consensus_osm": {
+  "1": 393,
+  "2": 613,
+  "3": 351
+ },
+ "thresholds": {
+  "accept": 0.9,
+  "reject": 0.3
+ },
+ "encroachment": [
+  {
+   "source": "OSM",
+   "id": "O00318",
+   "overlap_m2": 33.2,
+   "share": 0.236,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00380",
+   "overlap_m2": 23.3,
+   "share": 0.101,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00403",
+   "overlap_m2": 32.0,
+   "share": 0.254,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00425",
+   "overlap_m2": 30.4,
+   "share": 0.214,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00428",
+   "overlap_m2": 38.3,
+   "share": 0.215,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00449",
+   "overlap_m2": 18.0,
+   "share": 0.175,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00609",
+   "overlap_m2": 52.5,
+   "share": 0.125,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00726",
+   "overlap_m2": 35.0,
+   "share": 0.16,
+   "confirmed_by_two_sources": false
+  },
+  {
+   "source": "OSM",
+   "id": "O00768",
+   "overlap_m2": 36.3,
+   "share": 0.182,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00840",
+   "overlap_m2": 19.0,
+   "share": 0.145,
+   "confirmed_by_two_sources": false
+  },
+  {
+   "source": "OSM",
+   "id": "O00856",
+   "overlap_m2": 42.5,
+   "share": 0.121,
+   "confirmed_by_two_sources": false
+  },
+  {
+   "source": "OSM",
+   "id": "O00964",
+   "overlap_m2": 64.3,
+   "share": 0.163,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O00995",
+   "overlap_m2": 16.0,
+   "share": 0.111,
+   "confirmed_by_two_sources": false
+  },
+  {
+   "source": "OSM",
+   "id": "O01013",
+   "overlap_m2": 114.7,
+   "share": 0.286,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01097",
+   "overlap_m2": 116.3,
+   "share": 0.218,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01178",
+   "overlap_m2": 18.8,
+   "share": 0.121,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01201",
+   "overlap_m2": 31.8,
+   "share": 0.132,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01202",
+   "overlap_m2": 93.1,
+   "share": 0.13,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01263",
+   "overlap_m2": 29.8,
+   "share": 0.108,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01295",
+   "overlap_m2": 52.4,
+   "share": 0.108,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01301",
+   "overlap_m2": 22.7,
+   "share": 0.131,
+   "confirmed_by_two_sources": false
+  },
+  {
+   "source": "OSM",
+   "id": "O01308",
+   "overlap_m2": 16.8,
+   "share": 0.108,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01312",
+   "overlap_m2": 158.6,
+   "share": 0.274,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01340",
+   "overlap_m2": 34.2,
+   "share": 0.174,
+   "confirmed_by_two_sources": true
+  },
+  {
+   "source": "OSM",
+   "id": "O01341",
+   "overlap_m2": 34.1,
+   "share": 0.173,
+   "confirmed_by_two_sources": true
+  }
+ ],
+ "encroachment_other_sources": {
+  "Google": 184,
+  "Microsoft": 71
+ },
+ "coregistration": {
+  "OSM \u2194 Microsoft": {
+   "applied": true,
+   "anchors": 789,
+   "global_shift_m": [
+    3.35,
+    -0.39
+   ],
+   "shift_magnitude_m": {
+    "min": 2.57,
+    "median": 4.24,
+    "max": 7.27
+   },
+   "anchor_offset_median_m": {
+    "before": 4.85,
+    "after": 2.06
+   }
+  },
+  "OSM \u2194 Google": {
+   "applied": true,
+   "anchors": 774,
+   "global_shift_m": [
+    2.42,
+    0.99
+   ],
+   "shift_magnitude_m": {
+    "min": 1.28,
+    "median": 3.85,
+    "max": 6.04
+   },
+   "anchor_offset_median_m": {
+    "before": 4.57,
+    "after": 2.24
+   }
+  },
+  "Microsoft \u2194 Google": {
+   "applied": true,
+   "anchors": 804,
+   "global_shift_m": [
+    -0.55,
+    1.71
+   ],
+   "shift_magnitude_m": {
+    "min": 0.57,
+    "median": 1.86,
+    "max": 4.57
+   },
+   "anchor_offset_median_m": {
+    "before": 2.8,
+    "after": 2.33
+   }
+  }
+ },
+ "consensus_rule": "an OSM building counts as seen by a source when the model auto-links it or it lies inside a larger polygon of that source",
+ "notes": [
+  "All three building datasets are real and independent; nothing was planted.",
+  "The matcher was trained only on synthetic errors built from OSM footprints; these real pairs were never seen.",
+  "Accuracy on real data comes only from the hand-labelled sample. Other numbers describe disagreement, not accuracy.",
+  "Before matching, each pair of sources is co-registered: a local shift field from confident anchor buildings removes the few-metre offset between maps traced from different imagery.",
+  "One-to-many relations (one source traces a terrace or block as one polygon, another as several) are reported separately from one-to-one links.",
+  "Road reserves are estimated from OSM road class and width tags; encroachment flags are candidates for a field check."
+ ]
+}

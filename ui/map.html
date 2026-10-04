@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map explorer · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  html, body { height: 100%; }
+  body { display: grid; grid-template-rows: auto 1fr; }
+  main { display: grid; grid-template-columns: 290px minmax(0, 1fr) 360px; gap: 12px; padding: 12px; min-height: 0; }
+  aside, #mapwrap { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-height: 0; overflow: auto; }
+  aside { padding: 14px 16px; }
+  #mapwrap { position: relative; overflow: hidden; }
+  #map { position: absolute; inset: 0; background: #ece9e0; }
+  h3 { margin: 14px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  h3:first-child { margin-top: 0; }
+  .toggle { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+  .toggle .n { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #search { width: 100%; }
+  .dsw { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .dsw button { flex: 1; border: 0; background: none; padding: 6px 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .dsw button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  #results { list-style: none; margin: 8px 0 0; padding: 0; }
+  #results li { padding: 7px 8px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  #results li:hover { background: #f3f1ea; }
+  #detail h2 { margin: 0; font-size: 17px; }
+  #detail table.data td, #detail table.data th { padding: 6px 6px; }
+  #detail tr.cand { cursor: pointer; }
+  #detail tr.cand a { white-space: nowrap; }
+  #detail tr.cand[aria-current="true"] td { background: #eaf3f1; }
+  @media (max-width: 1100px) { body { display: block; } main { display: flex; flex-direction: column; } #mapwrap { height: 60vh; } }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<main>
+  <aside aria-label="Filters">
+    <h3>Data</h3>
+    <div class="dsw" id="dsw" role="group" aria-label="Data shown"></div>
+    <h3>Find a parcel</h3>
+    <input type="search" id="search" placeholder="Parcel ID or owner name" aria-label="Find a parcel">
+    <ul id="results"></ul>
+    <h3 id="aHead">Cadastral layer</h3>
+    <div id="statusToggles"></div>
+    <h3>Other layers</h3>
+    <label class="toggle"><input type="checkbox" id="showB" checked> <span class="dot" style="border:2px dashed #d9730d;background:transparent"></span> <span id="bName">Revenue layer</span></label>
+    <label class="toggle"><input type="checkbox" id="showTiles"> <span id="tilesName">Basemap (needs internet)</span></label>
+    <p class="hint" style="margin-top:16px" id="mapHint">Click any parcel to see its candidate links. Solid outlines are the cadastral layer, dashed are the revenue layer.</p>
+  </aside>
+  <section id="mapwrap" aria-label="Map"><div id="map"></div></section>
+  <aside id="detail" aria-live="polite"><div class="empty">Click a parcel on the map, or search for one.</div></aside>
+</main>
+
+<script src="vendor/leaflet.js"></script>
+<script src="assets/common.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("map.html");
+const DS = dataset(), Q = "dataset=" + DS;
+const NM = DS === "real" ? { a: "OSM building", b: "Microsoft footprint", A: "OSM buildings", B: "Microsoft (offset removed)" }
+                         : { a: "Cadastral parcel", b: "Revenue parcel", A: "Cadastral layer", B: "Revenue layer" };
+const M = { layers: null, pairs: [], latest: new Map(), groups: {}, B: null, hi: null, tiles: null, idx: new Map() };
+const map = L.map("map", { preferCanvas: true, zoomSnap: 0.25, attributionControl: false });
+
+function styleFor(st) {
+  return { color: STATUS[st].stroke, weight: st === "review" ? 2 : 1, fillColor: STATUS[st].color, fillOpacity: st === "review" ? 0.65 : st === "auto" ? 0.2 : 0.18 };
+}
+
+function highlight(features) {
+  if (M.hi) map.removeLayer(M.hi);
+  M.hi = L.geoJSON({ type: "FeatureCollection", features }, {
+    interactive: false,
+    style: (f) => f.properties.side === "a" ? { color: "#1f4fd8", weight: 3, fillColor: "#1f4fd8", fillOpacity: 0.28 }
+                                           : { color: "#ff6a00", weight: 3, fillOpacity: 0.12, fillColor: "#ff6a00", dashArray: "6 3" },
+  }).addTo(map);
+  map.fitBounds(M.hi.getBounds().pad(2), { maxZoom: 20 });
+}
+const feat = (side, id) => {
+  const f = M.idx.get(side + id);
+  return f ? { ...f, properties: { ...f.properties, side } } : null;
+};
+
+function select(side, id, focusOther) {
+  const f = M.idx.get(side + id);
+  if (!f) return;
+  const props = f.properties, other = side === "a" ? "b" : "a";
+  const cands = M.pairs.filter((p) => p[side] === id).sort((x, y) => y.p - x.p);
+  highlight([feat(side, id), ...(focusOther ? [feat(other, focusOther)] : cands.slice(0, 1).map((c) => feat(other, c[other])))].filter(Boolean));
+
+  const d = $("detail"); d.textContent = "";
+  d.append(el("div", "hint", side === "a" ? NM.a : NM.b), el("h2", "", id));
+  const tags = el("div"); tags.style.margin = "6px 0 12px";
+  tags.append(el("span", `tag ${props.status}`, STATUS[props.status].label)); d.append(tags);
+  const info = el("table", "data");
+  const rowsI = DS === "real" ? [["Candidate links shown", String(cands.length)]] : [["Owner on record", props.owner], ["Candidate links shown", String(cands.length)]];
+  for (const [k, v] of rowsI) {
+    const tr = el("tr"); tr.append(el("td", "", k), el("td", "num", v)); info.append(tr);
+  }
+  d.append(info);
+  const hr_ = side === "a" && DS !== "real" && M.harm.get(id);
+  if (hr_) {
+    const hh = el("h3", "", "Harmonised record"); hh.style.marginTop = "18px"; d.append(hh);
+    const band = el("div"); band.style.margin = "2px 0 8px";
+    band.append(el("span", `tag ${hr_.band === "High" ? "auto" : hr_.band === "Medium" ? "review" : "unmatched"}`, `Confidence ${hr_.confidence} · ${hr_.band}`));
+    d.append(band);
+    const ht = el("table", "data");
+    const area = (v) => (v == null ? "—" : fmtInt(Math.round(v)) + " m²");
+    for (const [k, v] of [["Owner (revenue record)", hr_.owner || "—"], ["Patta no. / survey no.", `${hr_.patta_no || "—"} / ${hr_.survey_no || "—"}`],
+                          ["Tax assessment no.", hr_.assessment_no || "—"], ["Land use", hr_.land_use || "—"],
+                          ["Surveyed area", area(hr_.surveyed_area_m2)], ["Recorded area (revenue)", hr_.recorded_area_m2 == null ? "—" : `${area(hr_.recorded_area_m2)} (${hr_.area_diff_pct > 0 ? "+" : ""}${hr_.area_diff_pct}%)`],
+                          ["Plinth area (tax)", area(hr_.plinth_area_m2)], ["Link type", hr_.link_type], ["Sources", (hr_.sources || "").replaceAll(",", ", ").replace("municipal_tax", "municipal tax")]]) {
+      const tr = el("tr"); tr.append(el("td", "", k), el("td", "num", v)); ht.append(tr);
+    }
+    d.append(ht);
+    const why = el("p", "hint", `Score parts: spatial ${hr_.spatial}, source ${hr_.source}, topology ${hr_.topology}, attributes ${hr_.attributes}.`);
+    d.append(why);
+    if (hr_.conflicts) {
+      const c = el("div", "banner bad"); c.style.marginTop = "8px"; c.style.display = "block";
+      c.append(el("b", "", "Conflicts: ")); c.append(document.createTextNode(hr_.conflicts)); d.append(c);
+    }
+  }
+
+  const h = el("h3", "", "Candidate links"); h.style.marginTop = "18px"; d.append(h);
+  if (!cands.length) {
+    d.append(el("p", "hint", "No candidate scored above the review threshold. This parcel is reported as having no counterpart in the other layer."));
+    return;
+  }
+  const t = el("table", "data");
+  const hr = el("tr"); for (const x of [side === "a" ? NM.b : NM.a, "Probability", "Status", ""]) hr.append(el("th", x === "Probability" ? "num" : "", x)); t.append(hr);
+  for (const c of cands) {
+    const dec = M.latest.get(key(c.a, c.b));
+    const tr = el("tr", "cand"); tr.tabIndex = 0;
+    if (focusOther === c[other]) tr.setAttribute("aria-current", "true");
+    const st = dec ? el("span", `tag ${dec.decision}`, dec.decision === "accept" ? "Accepted by officer" : "Rejected by officer")
+                   : el("span", `tag ${c.bucket === "accept" ? "auto" : "review"}`, c.bucket === "accept" ? (c.auto_by === "overlap" ? "Auto (overlap)" : "Auto-accepted") : "Needs review");
+    const tdOpen = el("td");
+    if (M.me.pages.includes("review.html")) { const open = el("a", "", "Open in review"); open.href = `review.html?data=${DS}#` + key(c.a, c.b); tdOpen.append(open); }
+    const tdSt = el("td"); tdSt.append(st);
+    tr.append(el("td", "mono", c[other]), el("td", "num", pct(c.p, 0)), tdSt, tdOpen);
+    tr.addEventListener("click", (e) => { if (e.target.tagName !== "A") select(side, id, c[other]); });
+    t.append(tr);
+  }
+  d.append(t);
+  const best = cands[0];
+  const ev = el("p", "hint", `Best candidate: ${best.centroid.toFixed(1)} m between centres, outline overlap ${best.iou.toFixed(2)}, area similarity ${best.area_ratio.toFixed(2)}.`);
+  d.append(ev);
+}
+
+function buildLayers() {
+  const counts = { auto: 0, review: 0, unmatched: 0 };
+  for (const f of M.layers.A.features) { counts[f.properties.status]++; M.idx.set("a" + f.properties.id, f); }
+  for (const f of M.layers.B.features) M.idx.set("b" + f.properties.id, f);
+  for (const st of ["auto", "review", "unmatched"]) {
+    M.groups[st] = L.geoJSON({ type: "FeatureCollection", features: M.layers.A.features.filter((f) => f.properties.status === st) }, {
+      style: () => styleFor(st),
+      onEachFeature: (f, l) => l.on("click", () => select("a", f.properties.id)),
+    }).addTo(map);
+    const lab = el("label", "toggle"); const cb = el("input"); cb.type = "checkbox"; cb.checked = true;
+    const dot = el("span", "dot"); dot.style.background = STATUS[st].color;
+    lab.append(cb, dot, document.createTextNode(STATUS[st].label), el("span", "n", fmtInt(counts[st])));
+    cb.addEventListener("change", () => cb.checked ? M.groups[st].addTo(map) : map.removeLayer(M.groups[st]));
+    $("statusToggles").append(lab);
+  }
+  M.B = L.geoJSON(M.layers.B, {
+    style: () => ({ color: "#d9730d", weight: 1.2, dashArray: "4 3", fillOpacity: 0 }),
+    onEachFeature: (f, l) => l.on("click", () => select("b", f.properties.id)),
+  }).addTo(map);
+  map.fitBounds(M.groups.auto.getBounds());
+}
+
+function search(q) {
+  const ul = $("results"); ul.textContent = "";
+  q = q.trim().toLowerCase();
+  if (q.length < 2) return;
+  const hits = [];
+  for (const side of ["A", "B"]) for (const f of M.layers[side].features) {
+    const p = f.properties;
+    if (p.id.toLowerCase().includes(q) || String(p.owner || "").toLowerCase().includes(q)) hits.push([side.toLowerCase(), p]);
+    if (hits.length >= 25) break;
+  }
+  if (!hits.length) { ul.append(el("li", "hint", "No match")); return; }
+  for (const [side, p] of hits) {
+    const li = el("li"); li.tabIndex = 0;
+    li.append(el("span", "mono", p.id), el("span", "hint", p.owner && p.owner !== "—" ? p.owner : side === "a" ? NM.a : NM.b));
+    li.addEventListener("click", () => select(side, p.id));
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter") select(side, p.id); });
+    ul.append(li);
+  }
+}
+
+async function init(me) {
+  M.me = me;
+  try {
+    datasetSwitch($("dsw"), DS);
+    $("aHead").textContent = NM.A; $("bName").textContent = NM.B;
+    $("search").placeholder = DS === "real" ? "Building ID (O… or M…)" : "Parcel ID or owner name";
+    if (DS === "real") { $("tilesName").textContent = "Satellite (needs internet)"; $("mapHint").textContent = "Click any building to see its candidate links. Solid: OSM. Dashed: Microsoft, moved to remove the map offset."; }
+    const [layers, pairs, log, harm] = await Promise.all([j("/api/layers?" + Q), j("/api/pairs?" + Q), j("/api/decisions?" + Q),
+                                                         DS === "real" ? Promise.resolve({ features: [] }) : j("/api/harmonised")]);
+    Object.assign(M, { layers, pairs, latest: latestDecisions(log), harm: new Map(harm.features.map((f) => [f.properties.parcel_id, f.properties])) });
+    buildLayers();
+    if (DS === "real") { $("showTiles").checked = true; $("showTiles").dispatchEvent(new Event("change")); }
+    const h = decodeURIComponent(location.hash.slice(1));
+    if (/^[ABOM]\d+$/.test(h)) select(DS === "real" ? (h[0] === "O" ? "a" : "b") : h[0].toLowerCase(), h);
+  } catch (e) { fatal($("detail"), e); }
+}
+$("search").addEventListener("input", (e) => search(e.target.value));
+$("showB").addEventListener("change", (e) => e.target.checked ? M.B.addTo(map) : map.removeLayer(M.B));
+$("showTiles").addEventListener("change", (e) => {
+  if (e.target.checked) {
+    M.tiles = DS === "real"
+      ? L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, maxNativeZoom: 19 })
+      : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 });
+    M.tiles.addTo(map); M.tiles.bringToBack();
+  }
+  else if (M.tiles) { map.removeLayer(M.tiles); M.tiles = null; }
+});
+ME.then(init);
+</script>
+</body>
+</html>

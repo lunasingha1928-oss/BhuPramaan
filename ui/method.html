@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Methodology · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  .limits li { margin: 6px 0; } .limits { padding-left: 18px; margin: 0; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: #f3f1ea; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>How it works and how it was tested</h1>
+      <p>Two kinds of evidence. <b>Real maps</b>: OpenStreetMap and Microsoft footprints of T. Nagar, with 300 pairs checked by hand
+         against satellite imagery. <b>Synthetic stress tests</b>: real footprints with planted errors, so every match can be scored exactly.</p></div>
+  </div>
+
+  <div class="grid g-12">
+    <div class="card s-12">
+      <h2>Pipeline</h2>
+      <p class="sub">From footprints to an officer's decision.</p>
+      <div class="flow" id="flow"></div>
+    </div>
+
+    <div class="card s-7">
+      <h2>Tested on real maps: hand-checked pairs</h2>
+      <p class="sub" id="realSub">OSM ↔ Microsoft, T. Nagar. Precision with 95% range, weighted back to all candidate pairs.</p>
+      <div id="realTable"></div>
+    </div>
+    <div class="card s-5">
+      <h2>Real change, 2016 → 2023</h2>
+      <p class="sub">Google Open Buildings Temporal, each flag checked against Microsoft's independent map.</p>
+      <div id="realChange"></div>
+    </div>
+
+    <div class="card s-12" style="padding-bottom:4px"><h2 style="font-size:16px">Synthetic stress tests</h2>
+      <p class="sub">Real footprints with planted errors (shifts, rescaling, rotation, splits, merges, missing and spurious parcels), so every link has a known answer.</p></div>
+
+    <div class="card s-7">
+      <h2>Stress test: errors the model was not trained on</h2>
+      <p class="sub" id="shiftSub">Trained on one error profile, tested on a harsher one.</p>
+      <div id="shiftChart"></div>
+    </div>
+    <div class="card s-5">
+      <h2>Repeatability across random seeds</h2>
+      <p class="sub" id="robSub">Errors re-injected and train/test blocks redrawn for every seed.</p>
+      <div id="robTable"></div>
+    </div>
+
+    <div class="card s-6">
+      <h2>Settings used for this run</h2>
+      <p class="sub">From <code>config/policy.yaml</code> and the demo build.</p>
+      <div id="settings"></div>
+    </div>
+    <div class="card s-6">
+      <h2>What these numbers do and don't show</h2>
+      <p class="sub">State these limits whenever the results are quoted.</p>
+      <ul class="limits" id="limits"></ul>
+    </div>
+  </div>
+</div>
+<script src="assets/common.js?v=9"></script>
+<script src="assets/charts.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("method.html");
+
+const STEPS = [
+  ["Ingest 3 sources", "cadastral, revenue, municipal tax; each in its own coordinate system"],
+  ["Clean topology", "repair invalid shapes, trim overlaps, flag slivers and gaps"],
+  ["Recognise columns", "schema matching and area-unit detection"],
+  ["Remove map offset", "co-registration: local shift field from confident anchor shapes"],
+  ["Match parcels", "R-tree candidates, 12 features, XGBoost + isotonic calibration; one-to-many shapes found"],
+  ["Harmonise", "one record per parcel, per-attribute authority, conflicts flagged, 0–100 confidence"],
+  ["Officer review", "only uncertain links; role-based, hash-chained audit log"],
+  ["Detect changes", "real 2016 → 2023 building layers, confirmed by an independent map"],
+];
+const SHORT = {
+  "A. trained default, tested default": "Same errors as training",
+  "B. trained default, tested SHIFTED": "Harsher errors, one-profile training",
+  "C. trained+calibrated on shifted (oracle)": "Upper bound (trained on harsh)",
+  "D. IoU baseline on shifted": "IoU baseline, harsher errors",
+  "E. trained on mixed profiles, tested SHIFTED": "Harsher errors, mixed training ★",
+};
+function missing(container, cmd) {
+  const p = el("div", "empty"); p.append(document.createTextNode("Not run yet. On the project folder, run "), el("code", "", cmd), document.createTextNode(" and reload."));
+  container.append(p);
+}
+
+async function init() {
+  try {
+    const flow = $("flow");
+    STEPS.forEach(([t, s], i) => {
+      const d = el("div", "step"); d.append(el("b", "", `${i + 1}. ${t}`), el("span", "", s)); flow.append(d);
+      if (i < STEPS.length - 1) flow.append(el("span", "arrow", "→"));
+    });
+    const soft = (u) => j(u).catch(() => null);
+    const [sum, meth, ev, tmp] = await Promise.all([j("/api/summary"), j("/api/methodology"), soft("/api/real/eval"), soft("/api/real/temporal")]);
+
+    if (ev && ev.labelled >= 30) {
+      $("realSub").textContent = `OSM ↔ Microsoft, T. Nagar. ${ev.labelled} pairs checked by hand` +
+        (ev.median_seconds ? ` (median ${ev.median_seconds.toFixed(0)} s each)` : "") + ". Precision with 95% range, weighted back to all candidate pairs.";
+      const t = el("table", "data");
+      const hr = el("tr"); for (const h of ["Rule", "Precision", "Recall"]) hr.append(el("th", h === "Rule" ? "" : "num", h)); t.append(hr);
+      const f = (x) => (x == null ? "—" : pct(x));
+      for (const [name, m] of [["Overlap rule, maps not co-registered", ev.iou_no_coreg], ["Overlap rule after co-registration", ev.iou_baseline],
+                               ["Model, auto-accept only", ev.model], ["Model or overlap (used in the console)", ev.combined],
+                               ["Model, accept or send to review", ev.model_or_review]]) {
+        if (!m) continue;
+        const tr = el("tr"); const ci = m.precision_ci && m.precision_ci[0] != null ? ` (${pct(m.precision_ci[0], 0)}–${pct(m.precision_ci[1], 0)})` : "";
+        tr.append(el("td", "", name), el("td", "num", f(m.precision) + ci), el("td", "num", f(m.recall))); t.append(tr);
+      }
+      $("realTable").append(t, el("div", "card-foot", "Removing the offset between the maps is what makes real matching work. The model, trained only on " +
+        "synthetic errors, is precise but cautious on real data; with officer review it finds most true matches."));
+    } else $("realTable").append(el("div", "empty", "Appears once at least 30 pairs are checked by hand on the Real data page."));
+
+    if (tmp) {
+      const s_ = tmp.summary, t = el("table", "data");
+      for (const [k, v] of [["Built since " + s_.years[0], `${s_.new} (${s_.new_confirmed} confirmed, ${s_.new_missing_in_osm} not yet in OSM)`],
+                            ["Possibly demolished", `${s_.demolished} (${s_.demolished_confirmed} confirmed absent)`],
+                            ["Grew ≥ " + s_.rules.taller_m + " m taller", String(s_.taller)]]) {
+        const tr = el("tr"); tr.append(el("td", "", k), el("td", "num", v)); t.append(tr);
+      }
+      $("realChange").append(t, el("div", "card-foot", `4 m pixels from Sentinel-2. Year-to-year drift (${s_.presence_drift}) is removed before comparing; ` +
+        "only large, compact changes are flagged, and each is a field-check candidate."));
+    } else $("realChange").append(el("div", "empty", "Not available for this role or not built yet."));
+
+    if (meth.shift) {
+      const rows = meth.shift.rows;
+      $("shiftSub").textContent = `Mean of ${meth.shift.seeds} seeds, geometry-only features. Harsher profile: ${meth.shift.description}.`;
+      barsGrouped($("shiftChart"), {
+        title: "Stress test",
+        categories: rows.map((r) => SHORT[r.setting] || r.setting),
+        series: [{ name: "Auto-accept precision", color: "var(--series-model)", values: rows.map((r) => r.prec[0]) },
+                 { name: "Auto-accept F1", color: "var(--series-base)", values: rows.map((r) => r.f1[0]) }],
+        labelWidth: 230,
+        note: "★ = the setup used in the console. Precision mostly holds when errors get harsher; recall (and so F1) drops unless training covers a wider range of errors.",
+      });
+    } else missing($("shiftChart"), "python scripts\\shift_check.py --input data\\ward.geojson --save demo\\shift.json");
+
+    if (meth.robustness) {
+      const r = meth.robustness;
+      $("robSub").textContent = `${r.seeds} seeds, mean ± standard deviation.`;
+      const keepCols = [0, 2, 3];   // precision, F1, no-review share
+      const t = el("table", "data");
+      const hr = el("tr"); hr.append(el("th", "", "Features used")); keepCols.forEach((c) => hr.append(el("th", "num", r.headers[c]))); t.append(hr);
+      for (const row of r.rows) {
+        const tr = el("tr"); tr.append(el("td", "", row.setting));
+        keepCols.forEach((c) => tr.append(el("td", "num", `${pct(row.mean[c])} ± ${pct(row.sd[c])}`)));
+        t.append(tr);
+      }
+      $("robTable").append(t, el("div", "card-foot", `Removing owner names changes nothing, so the score does not lean on the synthetic names. ` +
+        `IoU baseline F1 on the same runs: ${pct(r.rows[0].mean[5])} ± ${pct(r.rows[0].sd[5])}.`));
+    } else missing($("robTable"), "python scripts\\robustness.py --input data\\ward.geojson --save demo\\robustness.json");
+
+    const st = el("table", "data");
+    for (const [k, v] of [
+      ["Footprint source", sum.source], ["Cadastral / revenue parcels", `${fmtInt(sum.n_cadastral)} / ${fmtInt(sum.n_revenue)}`],
+      ["Candidate pairs scored", fmtInt(sum.n_candidates)], ["Spatial folds", String(sum.folds)],
+      ["Target auto-accept precision", pct(sum.target_auto_precision, 0)],
+      ["Auto-accept at or above", pct(sum.thresholds.accept_at_or_above, 1) + (sum.thresholds.per_fold ? " (mean of " + sum.thresholds.per_fold.length + " folds; each pair uses its own fold's)" : "")],
+      ["Drop below", pct(sum.thresholds.reject_below, 1)],
+      ["Error profile shown in the console", sum.shift_description]]) {
+      const tr = el("tr"); const tv = el("td", v.length > 40 ? "" : "num", v); tr.append(el("td", "", k), tv); st.append(tr);
+    }
+    $("settings").append(st);
+
+    const lim = $("limits");
+    for (const l of [
+      "Real-data accuracy comes from one dense ward (T. Nagar) and building footprints, not legal parcel boundaries. Other areas are not yet measured.",
+      "On real maps the model alone is cautious (finds about half of true matches by itself); the console combines it with an overlap rule and officer review.",
+      "The synthetic footprints are real, but their errors are injected. The model has learned these error patterns; real land records will have others.",
+      "Owner names are synthetic, so name matching is shown to officers but is not part of the score.",
+      "The precision target is met on calibration data. On the harsher profile it can slip slightly below it.",
+      "About 3% of true links are dropped without an officer seeing them. They appear as parcels with no counterpart.",
+      "Small categories (for example merges) rest on a few dozen cases, so their percentages are rough.",
+      "Owner names, areas, land use, tax records and the later survey are synthetic, with planted conflicts and changes; real departmental data will be messier.",
+      "Merged revenue records (one record for several parcels) are reported as a link type, not as owner or land-use conflicts.",
+    ]) lim.append(el("li", "", l));
+  } catch (e) { fatal($("page"), e); }
+}
+ME.then(init);
+</script>
+</body>
+</html>

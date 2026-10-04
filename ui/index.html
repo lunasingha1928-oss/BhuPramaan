@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; height: 100%; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .hero-card { display: flex; flex-direction: column; justify-content: center; }
+  .decisions li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+  .decisions li:last-child { border-bottom: 0; }
+  .decisions ul { list-style: none; margin: 0; padding: 0; }
+  .notes ul { margin: 0; padding-left: 18px; font-size: 13px; } .notes li { margin: 4px 0; }
+  .map-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .map-legend span { display: inline-flex; gap: 6px; align-items: center; }
+  .modules { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
+  @media (max-width: 1100px) { .modules { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .module { border: 1px solid var(--line-soft); background: #faf9f6; border-radius: 8px; padding: 10px 12px; }
+  .module .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .module .v { font-size: 20px; font-weight: 600; margin-top: 2px; } .module .n { font-size: 12px; color: var(--faint); }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>Ward overview</h1><p id="lede">Loading…</p></div>
+    <div style="display:flex;gap:8px"><a class="btn primary" href="review.html" id="reviewBtn">Open review queue</a><a class="btn" href="map.html">Explore the map</a></div>
+  </div>
+
+  <div class="grid g-12">
+    <div class="card s-4 hero-card hero" id="hero"></div>
+    <div class="s-8"><div class="tiles" id="tiles"></div></div>
+
+    <div class="card s-12" id="modulesCard">
+      <h2>Every module of the problem statement, measured</h2>
+      <p class="sub">Each number is checked against known answers in the test data. Open Data quality or Changes for the detail.</p>
+      <div class="modules" id="modules"></div>
+    </div>
+
+    <div class="card s-7">
+      <h2>Where every cadastral parcel stands</h2>
+      <p class="sub">Each parcel is auto-resolved, sent to an officer, or reported as having no counterpart in the revenue layer.</p>
+      <div id="statusChart"></div>
+      <div class="card-foot" id="statusFoot"></div>
+      <h2 style="margin-top:22px">What needs doing</h2>
+      <p class="sub">Each group has its own place in the console.</p>
+      <table class="data" id="todo"></table>
+    </div>
+    <div class="card s-5">
+      <h2>Ward map</h2>
+      <p class="sub">Cadastral parcels coloured by status. Click to open the map explorer.</p>
+      <svg class="minimap" id="minimap" role="img" aria-label="Overview map of the ward"></svg>
+      <div class="map-legend" id="mapLegend"></div>
+    </div>
+
+    <div class="card s-6">
+      <h2>Calibrated model vs plain IoU matching</h2>
+      <p class="sub">Same parcels, same errors. Out-of-fold: every parcel scored by a model that never saw that part of the map.</p>
+      <div id="vsChart"></div>
+    </div>
+    <div class="card s-6">
+      <h2>Links auto-accepted, by type of error</h2>
+      <p class="sub">Share of true links accepted without a person, for each kind of injected error.</p>
+      <div id="typeChart"></div>
+    </div>
+
+    <div class="card s-5">
+      <h2>Is the confidence honest?</h2>
+      <p class="sub">When the model says 80%, is it right about 80% of the time? Points on the dashed line mean yes.</p>
+      <div id="calChart"></div>
+      <div class="card-foot">Hollow points rest on fewer than 30 pairs, so treat them as rough. Most pairs sit near 0% or 100%.</div>
+    </div>
+    <div class="card s-4 decisions">
+      <h2>Recent officer decisions</h2>
+      <p class="sub" id="auditLine">Audit log</p>
+      <div id="recent"></div>
+      <div class="card-foot"><a href="audit.html">Open the full audit log →</a></div>
+    </div>
+    <div class="card s-3 notes">
+      <h2>About this data</h2>
+      <p class="sub">Read before quoting any number.</p>
+      <div id="notes"></div>
+      <div class="card-foot"><a href="method.html">How the numbers are made →</a></div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/common.js?v=9"></script>
+<script src="assets/charts.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("index.html");
+
+function tile(label, value, note) {
+  const d = el("div", "card tile");
+  d.append(el("div", "label", label), el("div", "value", value));
+  if (note) d.append(el("div", "note", note));
+  return d;
+}
+
+async function init(me) {
+  if (!me.pages.includes("review.html")) $("reviewBtn").remove();
+  if (!me.pages.includes("map.html")) {
+    document.querySelector('.page-head a[href="map.html"]').remove();
+    $("minimap").style.cursor = "default";
+    $("minimap").previousElementSibling.textContent = "Cadastral parcels coloured by status.";
+  }
+  if (!me.pages.includes("audit.html")) document.querySelector('a[href="audit.html"]').parentElement.remove();
+  try {
+    const [sum, layers, rev, log, verify] = await Promise.all([
+      j("/api/summary"), j("/api/layers"), j("/api/pairs?bucket=review"), j("/api/decisions"), j("/api/verify")]);
+    const m = sum.metrics.model, b = sum.metrics.baseline;
+    const latest = latestDecisions(log);
+    const pending = rev.filter((p) => !latest.has(key(p.a, p.b))).length;
+
+    $("lede").textContent = `${fmtInt(sum.n_cadastral)} cadastral and ${fmtInt(sum.n_revenue)} revenue parcels. ` +
+      `Footprints: ${sum.source.replace("real:", "")} (real). Errors and owner names are synthetic.`;
+    if ($("reviewBtn")) $("reviewBtn").textContent = pending ? `Open review queue (${pending})` : "Open review queue";
+
+    const hero = $("hero");
+    hero.append(el("div", "tile label", "Resolved without a person"), el("b", "", pct(m.auto_resolved_share)),
+      el("span", "", `Auto-accepted links were correct ${pct(m.auto_precision)} of the time. Plain IoU matching resolves ${pct(b.auto_resolved_share)}.`));
+
+    const tiles = $("tiles");
+    tiles.append(
+      tile("Cadastral parcels", fmtInt(sum.n_cadastral), `${fmtInt(sum.n_candidates)} candidate pairs checked`),
+      tile("Awaiting review", String(pending), `${sum.n_review_pairs} links flagged in total`),
+      tile("Links decided by officers", String(latest.size), `${log.length} audit entries`),
+      tile("No counterpart found", fmtInt(sum.n_unmatched_parcels), "reported, not force-matched"));
+
+    const md = sum.modules;
+    if (md) {
+      for (const [k, v, n] of [
+        ["Spatial matching", pct(m.auto_f1), "F1 on unseen errors"],
+        ["Confidence 0–100", pct(md.confidence_high_share, 0), "of parcels scored High"],
+        ["Topology repair", `${md.topology_errors.revenue_before} → ${md.topology_errors.revenue_after}`, "errors in the revenue layer"],
+        ["Attribute mapping", md.schema_correct, `columns right · units: ${md.units}`],
+        ["Conflict detection", pct(md.conflict_recall, 0), `recall · ${pct(md.conflict_precision, 0)} precision`],
+        ["Change detection", pct(md.change_recall, 0), `recall · ${pct(md.change_precision, 0)} precision`],
+        ["Coordinate systems", String(md.crs_handled.length), md.crs_handled.join(", ")]]) {
+        const d = el("div", "module"); d.append(el("div", "k", k), el("div", "v", v), el("div", "n", n)); $("modules").append(d);
+      }
+    } else $("modulesCard").remove();
+
+    stack100($("statusChart"), [
+      { label: STATUS.auto.label, value: sum.n_auto_parcels, color: STATUS.auto.color },
+      { label: STATUS.review.label, value: sum.n_review_parcels, color: STATUS.review.color },
+      { label: STATUS.unmatched.label, value: sum.n_unmatched_parcels, color: STATUS.unmatched.color }]);
+    $("statusFoot").textContent = `Auto-accept needs a calibrated probability of at least ${pct(sum.thresholds.accept_at_or_above, 0)}; ` +
+      `below ${pct(sum.thresholds.reject_below, 0)} a candidate is dropped.`;
+
+    const todo = $("todo");
+    for (const [st, n, what, href, cta] of [
+      ["review", pending, "links are waiting for an officer's decision", "review.html", "Review queue"],
+      ["unmatched", sum.n_unmatched_parcels, "parcels have no counterpart in the revenue layer; check them on the map", "map.html", "Map explorer"],
+      ["auto", sum.n_auto_parcels, "parcels were resolved automatically; spot-check the least confident ones", "review.html", "Review queue, Auto tab"]]) {
+      const tr = el("tr");
+      const tdS = el("td"); tdS.append(el("span", `tag ${st}`, STATUS[st].label));
+      const tdA = el("td"); const a = el("a", "", cta + " →"); a.href = href; tdA.append(a); tdA.style.whiteSpace = "nowrap";
+      tr.append(tdS, el("td", "num", fmtInt(n)), el("td", "", what), tdA); todo.append(tr);
+    }
+    minimap($("minimap"), layers.A, me.pages.includes("map.html") ? () => (location.href = "map.html") : null);
+    for (const st of ["auto", "review", "unmatched"]) {
+      const s = el("span"); const d = el("i", "dot"); d.style.background = STATUS[st].color;
+      s.append(d, document.createTextNode(STATUS[st].label)); $("mapLegend").append(s);
+    }
+
+    const series = (f) => [{ name: "Calibrated model", color: "var(--series-model)", values: f(m) },
+                           { name: "IoU baseline", color: "var(--series-base)", values: f(b) }];
+    barsGrouped($("vsChart"), {
+      title: "Model vs baseline",
+      categories: ["Auto-accept precision", "Auto-accept recall", "Auto-accept F1", "Parcels needing no review"],
+      series: series((r) => [r.auto_precision, r.auto_recall, r.auto_f1, r.auto_resolved_share]),
+    });
+
+    const types = Object.keys(m.per_type);
+    barsGrouped($("typeChart"), {
+      title: "Recall by error type",
+      categories: types.map((t) => `${ERROR_LABELS[t] || t} (${m.per_type[t].n})`),
+      series: series((r) => types.map((t) => r.per_type[t] ? r.per_type[t].auto_recall : null)),
+      labelWidth: 190,
+    });
+
+    if (sum.calibration) reliability($("calChart"), sum.calibration);
+    else $("calChart").append(el("div", "empty", "Re-run scripts/build_demo.py to add the calibration chart."));
+
+    $("auditLine").textContent = `${log.length} entries · ` + (verify.valid ? "hash chain verified ✓" : `tampering detected at entry ${verify.first_bad_seq}`);
+    const recent = [...latest.values()].sort((x, y) => y.seq - x.seq).slice(0, 6);
+    if (!recent.length) $("recent").append(el("div", "empty", "No decisions yet."));
+    else {
+      const ul = el("ul");
+      for (const d of recent) {
+        const li = el("li"); const a = el("a", "", `${d.a_id} ↔ ${d.b_id}`); a.href = "review.html#" + key(d.a_id, d.b_id);
+        li.append(a, el("span", `tag ${d.decision}`, d.decision === "accept" ? "Accepted" : "Rejected"),
+          el("span", "hint", `${d.officer} · ${new Date(d.ts).toLocaleString()}`), el("span", "hint", `model ${pct(d.model_p, 0)}`));
+        ul.append(li);
+      }
+      $("recent").append(ul);
+    }
+
+    const ul = el("ul"); for (const n of sum.notes) ul.append(el("li", "", n)); $("notes").append(ul);
+  } catch (e) { fatal($("page"), e); }
+}
+ME.then(init);
+</script>
+</body>
+</html>

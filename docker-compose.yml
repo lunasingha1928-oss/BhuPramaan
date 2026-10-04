@@ -1,0 +1,13 @@
+services:
+  console:
+    build: .
+    image: sih26013-console
+    ports:
+      - "8000:8000"
+    volumes:
+      # decisions, labels, users, uploads and the access log survive restarts
+      - console-state:/app/demo
+    restart: unless-stopped
+
+volumes:
+  console-state:

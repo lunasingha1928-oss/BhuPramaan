@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changes · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  html, body { height: 100%; }
+  body { display: grid; grid-template-rows: auto 1fr; }
+  main { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 12px; padding: 12px; min-height: 0; }
+  aside, #mapwrap { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-height: 0; }
+  aside { overflow: auto; padding: 14px 16px; }
+  #mapwrap { position: relative; overflow: hidden; }
+  #map { position: absolute; inset: 0; background: #ece9e0; }
+  .modes { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin: 2px 0 12px; }
+  .modes button { flex: 1; padding: 8px 6px; border: 0; background: none; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  .modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 14px; }
+  .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .kpi b { display: block; font-size: 22px; } .kpi span { font-size: 12px; color: var(--muted); }
+  .kpi .pr { font-size: 11px; color: var(--faint); margin-top: 2px; }
+  .filters label { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+  #list li { list-style: none; padding: 7px 4px; border-bottom: 1px solid var(--line-soft); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  #list li:hover { background: #faf9f6; } #list { padding: 0; margin: 8px 0 0; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #eef4ea; color: #2c6b2c; white-space: nowrap; }
+  .tag.warn { background: #fdf3dc; color: #7a5600; }
+  @media (max-width: 1000px) { body { display: block; } main { display: flex; flex-direction: column; } #mapwrap { height: 60vh; } }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<main>
+  <aside aria-label="Change summary">
+    <div class="modes" id="modes" role="group" aria-label="Data shown"></div>
+    <h2 style="margin:0;font-size:17px" id="title">Changes</h2>
+    <p class="hint" style="margin:4px 0 0" id="intro"></p>
+    <div class="kpis" id="kpis"></div>
+    <div class="filters" id="filters"></div>
+    <div id="exp" style="margin-top:10px"></div>
+    <ul id="list" aria-label="Detected changes"></ul>
+    <p class="hint" style="margin-top:12px" id="foot"></p>
+  </aside>
+  <section id="mapwrap" aria-label="Map of changes"><div id="map"></div></section>
+</main>
+<script src="vendor/leaflet.js"></script>
+<script src="assets/common.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("changes.html");
+const REAL = {
+  new: { label: "Built since 2016", color: "#2a78d6" },
+  demolished: { label: "Possibly demolished", color: "#eb6834" },
+  taller: { label: "Grew taller", color: "#1baf7a" },
+};
+const C = { me: null, hi: null, layers: [], base: null, sat: null, real: null, synth: null, synthLayers: null };
+const map = L.map("map", { preferCanvas: true, zoomSnap: 0.25, attributionControl: true });
+C.sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 20, maxNativeZoom: 19, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" });
+
+function focus(f) {
+  if (C.hi) map.removeLayer(C.hi);
+  C.hi = L.geoJSON(f, { interactive: false, style: { color: "#d03b3b", weight: 3, fillOpacity: 0 } }).addTo(map);
+  map.fitBounds(C.hi.getBounds().pad(3), { maxZoom: 19 });
+}
+function clear() {
+  for (const l of C.layers) map.removeLayer(l);
+  C.layers = []; if (C.hi) { map.removeLayer(C.hi); C.hi = null; }
+  for (const id of ["kpis", "filters", "exp", "list"]) $(id).textContent = "";
+}
+function kpi(value, label, color, note) {
+  const d = el("div", "kpi"); const lab = el("span"); const dot = el("i", "dot"); dot.style.background = color; dot.style.marginRight = "6px";
+  lab.append(dot, document.createTextNode(label)); d.append(el("b", "", value), lab); if (note) d.append(el("div", "pr", note)); return d;
+}
+function addGroup(k, feats, meta, style, tip) {
+  const g = L.geoJSON({ type: "FeatureCollection", features: feats }, { style: () => style, onEachFeature: (f, l) => l.bindTooltip(tip(f)) }).addTo(map);
+  C.layers.push(g);
+  const lab = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.checked = true;
+  const dot = el("span", "dot"); dot.style.background = meta.color;
+  lab.append(cb, dot, document.createTextNode(`${meta.label} (${feats.length})`));
+  cb.addEventListener("change", () => (cb.checked ? g.addTo(map) : map.removeLayer(g)));
+  $("filters").append(lab);
+}
+
+/* ---------- real: Google Open Buildings Temporal, 2016 vs 2023 ---------- */
+function showReal() {
+  clear();
+  const { summary: s, features } = C.real;
+  const ind = s.independent_sources.join(" and ") || "another map";
+  $("title").textContent = `Real change, ${s.years[0]} → ${s.years[1]}`;
+  $("intro").textContent = `Google's yearly building layer (${s.pixel_m} m pixels, from Sentinel-2) shows where buildings appeared, vanished or grew. ` +
+    `Each flag is checked against ${ind}'s independent map of today.`;
+  $("kpis").append(
+    kpi(fmtInt(s.new), REAL.new.label, REAL.new.color, `${s.new_confirmed} confirmed by ${ind} · ${s.new_missing_in_osm} not yet in OSM`),
+    kpi(fmtInt(s.demolished), REAL.demolished.label, REAL.demolished.color, `${s.demolished_confirmed} confirmed absent in ${ind}`),
+    kpi(fmtInt(s.taller), REAL.taller.label, REAL.taller.color, `≥ ${s.rules.taller_m} m higher (about 2 floors)`));
+  C.sat.addTo(map); C.layers.push(C.sat);
+  if (C.synthLayers) { const b = L.geoJSON(C.synthLayers.A, { interactive: false, style: { color: "#ffffff", weight: 0.6, fillOpacity: 0, opacity: 0.6 } }).addTo(map); C.layers.push(b); }
+  for (const k of ["new", "demolished", "taller"]) {
+    const feats = features.features.filter((f) => f.properties.change === k);
+    addGroup(k, feats, REAL[k], { color: REAL[k].color, weight: 2.2, fillColor: REAL[k].color, fillOpacity: k === "demolished" ? 0.2 : 0.4, dashArray: k === "demolished" ? "4 3" : null },
+      (f) => describe(f.properties));
+  }
+  const all = L.geoJSON(features); if (all.getLayers().length) map.fitBounds(all.getBounds().pad(0.05));
+  const ul = $("list");
+  const order = { true: 0, false: 1 };
+  const sorted = [...features.features].sort((a, b) => order[a.properties.confirmed] - order[b.properties.confirmed] || (b.properties.area_m2 || 0) - (a.properties.area_m2 || 0));
+  for (const f of sorted) {
+    const p = f.properties; const li = el("li"); li.tabIndex = 0;
+    const left = el("span"); const dot = el("i", "dot"); dot.style.background = REAL[p.change].color; dot.style.marginRight = "6px";
+    left.append(dot, document.createTextNode(p.change === "taller" ? `${p.osm_id}: +${p.gain_m} m` : `${REAL[p.change].label}, ${fmtInt(p.area_m2)} m²`));
+    const right = el("span");
+    if (p.change === "new" && p.missing_in_osm) right.append(el("span", "tag warn", "not in OSM"), document.createTextNode(" "));
+    if (p.change !== "taller") right.append(el("span", p.confirmed ? "tag" : "tag warn", p.confirmed ? "confirmed" : "unconfirmed"));
+    else right.append(el("span", "tag warn", "field check"));
+    li.append(left, right);
+    li.addEventListener("click", () => focus(f)); li.addEventListener("keydown", (e) => { if (e.key === "Enter") focus(f); });
+    ul.append(li);
+  }
+  $("foot").textContent = `The yearly layer is itself a model output and is noisy: between years it drifts by ${s.presence_drift} in presence (removed before comparing), ` +
+    `and building heights differ by ±${(s.height_change_iqr_m / 2).toFixed(1)} m on unchanged buildings, so only large changes are flagged. ` +
+    `"Confirmed" means ${ind}'s independent map agrees. Google's own footprints come from the same producer and are not counted. Every flag needs a field check before records change.`;
+}
+function describe(p) {
+  if (p.change === "taller") return `Grew taller: ${p.height_before_m} → ${p.height_after_m} m (about +${p.floors_added_approx} floors)`;
+  const pc = (x) => (x == null ? "—" : pct(x, 0));
+  return `${REAL[p.change].label}, ${fmtInt(p.area_m2)} m². Covered today by Microsoft ${pc(p.in_microsoft_today)}, OSM ${pc(p.in_osm_today)}`;
+}
+
+/* ---------- synthetic: planted changes, exact scores ---------- */
+function showSynth() {
+  clear();
+  const data = C.synth, layers = C.synthLayers;
+  $("title").textContent = "Synthetic test: changes since the last survey";
+  $("intro").textContent = "The same matcher compares the earlier survey with a later one. Buildings it can't find again are demolished, new outlines are new buildings, and matched outlines that grew markedly are flagged as altered.";
+  const base = L.geoJSON(layers.A, { interactive: false, style: { color: "#9a988f", weight: 0.8, fillColor: "#c9c6bb", fillOpacity: 0.25 } }).addTo(map);
+  C.layers.push(base);
+  const s = data.summary.scores;
+  for (const k of ["new", "demolished", "altered"]) $("kpis").append(kpi(fmtInt(s[k].detected), CHANGE[k].label, CHANGE[k].color, `precision ${pct(s[k].precision, 0)} · recall ${pct(s[k].recall, 0)}`));
+  for (const k of ["new", "demolished", "altered"]) {
+    const feats = data.features.features.filter((f) => f.properties.change === k);
+    addGroup(k, feats, CHANGE[k], { color: CHANGE[k].color, weight: 2, fillColor: CHANGE[k].color, fillOpacity: k === "demolished" ? 0.15 : 0.45, dashArray: k === "demolished" ? "4 3" : null },
+      (f) => `${CHANGE[k].label}${f.properties.area_change_pct != null ? ` (${f.properties.area_change_pct > 0 ? "+" : ""}${f.properties.area_change_pct}% area)` : ""}`);
+  }
+  map.fitBounds(base.getBounds());
+  if (C.me.can.export) { const a = el("a", "btn", "Download changes (GeoJSON)"); a.href = "/api/export/changes.geojson"; $("exp").append(a); }
+  const ul = $("list");
+  for (const f of data.features.features) {
+    const p = f.properties; const li = el("li"); li.tabIndex = 0;
+    const left = el("span"); const dot = el("i", "dot"); dot.style.background = CHANGE[p.change].color; dot.style.marginRight = "6px";
+    left.append(dot, document.createTextNode(p.earlier_id || p.later_id));
+    li.append(left, el("span", "hint", p.area_change_pct != null ? `${p.area_change_pct > 0 ? "+" : ""}${p.area_change_pct}% area` : CHANGE[p.change].label));
+    li.addEventListener("click", () => focus(f)); li.addEventListener("keydown", (e) => { if (e.key === "Enter") focus(f); });
+    ul.append(li);
+  }
+  $("foot").textContent = "The later survey is synthetic, with known planted changes, so the precision and recall above are exact. Field verification should confirm each change before records are updated.";
+}
+
+function setMode(m) {
+  for (const b of $("modes").children) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
+  try { localStorage.setItem("changesMode", m); } catch (e) { /* storage blocked */ }
+  (m === "real" ? showReal : showSynth)();
+}
+
+async function init(me) {
+  C.me = me;
+  try {
+    const soft = (u) => j(u).catch(() => null);           // either half may be missing; show what exists
+    const [synth, layers, real] = await Promise.all([soft("/api/changes"), soft("/api/layers"), soft("/api/real/temporal")]);
+    if (!synth && !real) throw new Error("No change data yet. Run scripts/build_demo.py (synthetic) or scripts/build_real.py (real).");
+    C.synth = synth; C.synthLayers = layers; C.real = real;
+    const modes = [["real", `Real: ${real ? real.summary.years.join(" → ") : "not built"}`], ["synth", synth ? "Synthetic test (exact scores)" : "Synthetic: not built"]];
+    for (const [m, label] of modes) {
+      const b = el("button", "", label); b.dataset.mode = m; b.type = "button";
+      if (m === "real" && !real) { b.disabled = true; b.title = "Run scripts/build_real.py with the Google temporal GeoTIFFs in data/real"; }
+      if (m === "synth" && !(synth && layers)) { b.disabled = true; b.title = "Run scripts/build_demo.py"; }
+      b.addEventListener("click", () => setMode(m)); $("modes").append(b);
+    }
+    let saved = null; try { saved = localStorage.getItem("changesMode"); } catch (e) { /* ignore */ }
+    setMode(real && (saved !== "synth" || !synth) ? "real" : "synth");
+  } catch (e) { fatal(document.querySelector("aside"), e); }
+}
+ME.then(init);
+</script>
+</body>
+</html>

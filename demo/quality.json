@@ -1,0 +1,1343 @@
+{
+ "topology": {
+  "revenue": {
+   "before": {
+    "parcels": 1409,
+    "invalid": 37,
+    "overlaps": 430,
+    "overlap_area_m2": 19804.791228106224,
+    "slivers": 0,
+    "near_miss_gaps": 28
+   },
+   "after": {
+    "parcels": 1409,
+    "invalid": 0,
+    "overlaps": 4,
+    "overlap_area_m2": 808.6570744805163,
+    "slivers": 3,
+    "near_miss_gaps": 50
+   },
+   "defects_injected": 42,
+   "actions": {
+    "fixed invalid geometry": 37,
+    "trimmed overlap": 426,
+    "removed sliver fragments": 22
+   }
+  },
+  "cadastral": {
+   "before": {
+    "parcels": 1356,
+    "invalid": 0,
+    "overlaps": 0,
+    "overlap_area_m2": 0.0,
+    "slivers": 0,
+    "near_miss_gaps": 6
+   },
+   "after": {
+    "parcels": 1356,
+    "invalid": 0,
+    "overlaps": 0,
+    "overlap_area_m2": 0.0,
+    "slivers": 0,
+    "near_miss_gaps": 6
+   },
+   "actions": {}
+  },
+  "settings": {
+   "overlap_min_m2": 0.5,
+   "sliver_max_m2": 2.0,
+   "sliver_thinness": 0.08,
+   "gap_max_m": 0.3,
+   "defect_rate": 0.03
+  }
+ },
+ "crs": [
+  {
+   "source": "Cadastral survey layer",
+   "file": "cadastral_survey.gpkg",
+   "features": 1356,
+   "delivered_crs": "EPSG:32644",
+   "delivered_crs_name": "WGS 84 / UTM zone 44N",
+   "working_crs": "EPSG:32644",
+   "working_crs_name": "WGS 84 / UTM zone 44N",
+   "round_trip_error_m": 0.0
+  },
+  {
+   "source": "Revenue record layer",
+   "file": "revenue_records_epsg7755.gpkg",
+   "features": 1409,
+   "delivered_crs": "EPSG:7755",
+   "delivered_crs_name": "WGS 84 / India NSF LCC",
+   "working_crs": "EPSG:32644",
+   "working_crs_name": "WGS 84 / UTM zone 44N",
+   "round_trip_error_m": 0.0
+  },
+  {
+   "source": "Municipal property-tax points",
+   "file": "property_tax_points_wgs84.geojson",
+   "features": 1184,
+   "delivered_crs": "EPSG:4326",
+   "delivered_crs_name": "WGS 84",
+   "working_crs": "EPSG:32644",
+   "working_crs_name": "WGS 84 / UTM zone 44N",
+   "round_trip_error_m": 0.0
+  }
+ ],
+ "schema": {
+  "revenue": [
+   {
+    "column": "Patta_No",
+    "field": "parcel_ref",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   },
+   {
+    "column": "Pattadar_Name",
+    "field": "owner_name",
+    "confidence": 0.939,
+    "name_evidence": 1.0,
+    "value_evidence": 0.86,
+    "correct": true
+   },
+   {
+    "column": "Extent",
+    "field": "area",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   },
+   {
+    "column": "Classfn",
+    "field": "land_use",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   },
+   {
+    "column": "SF_No",
+    "field": "survey_no",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   }
+  ],
+  "tax": [
+   {
+    "column": "Assessment_No",
+    "field": "parcel_ref",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   },
+   {
+    "column": "Assessee",
+    "field": "owner_name",
+    "confidence": 0.937,
+    "name_evidence": 1.0,
+    "value_evidence": 0.86,
+    "correct": true
+   },
+   {
+    "column": "Plinth_Area_SqFt",
+    "field": "area",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   },
+   {
+    "column": "Usage",
+    "field": "land_use",
+    "confidence": 1.0,
+    "name_evidence": 1.0,
+    "value_evidence": 1.0,
+    "correct": true
+   }
+  ]
+ },
+ "units": {
+  "revenue": {
+   "unit": "cent",
+   "m2_per_unit_observed": 40.4943,
+   "m2_per_unit_expected": 40.468564,
+   "relative_error": 0.0006,
+   "parcels_used": 903,
+   "column": "Extent",
+   "truth": "cent"
+  },
+  "tax": {
+   "unit": "square foot",
+   "m2_per_unit_observed": 0.093,
+   "m2_per_unit_expected": 0.09290304,
+   "relative_error": 0.001,
+   "parcels_used": 1184,
+   "column": "Plinth_Area_SqFt",
+   "truth": "square foot"
+  }
+ },
+ "tax_join": {
+  "points": 1184,
+  "joined": 1184,
+  "correct_share": 0.9991554054054054
+ },
+ "conflicts": {
+  "metrics": {
+   "owner": {
+    "injected": 96,
+    "flagged": 96,
+    "correct": 87,
+    "precision": 0.90625,
+    "recall": 0.90625
+   },
+   "area": {
+    "injected": 27,
+    "flagged": 30,
+    "correct": 27,
+    "precision": 0.9,
+    "recall": 1.0
+   },
+   "land_use": {
+    "injected": 101,
+    "flagged": 94,
+    "correct": 90,
+    "precision": 0.9574468085106383,
+    "recall": 0.8910891089108911
+   }
+  },
+  "by_type": {
+   "owner": 96,
+   "area": 30,
+   "land_use": 94
+  },
+  "parcels_with_conflicts": 203,
+  "list": [
+   {
+    "parcel_id": "A00002",
+    "type": "owner",
+    "detail": "revenue owner 'Chandrasekar Babu' vs tax assessee 'Rahim Mudaliar'"
+   },
+   {
+    "parcel_id": "A00004",
+    "type": "area",
+    "detail": "recorded 261 m\u00b2 vs surveyed 387 m\u00b2"
+   },
+   {
+    "parcel_id": "A00007",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00013",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00015",
+    "type": "owner",
+    "detail": "revenue owner 'Chandrasekar Khan' vs tax assessee 'Ramasamy Babu'"
+   },
+   {
+    "parcel_id": "A00018",
+    "type": "owner",
+    "detail": "revenue owner 'Muthusamy Menon' vs cadastral 'Abdul Sheikh'"
+   },
+   {
+    "parcel_id": "A00019",
+    "type": "owner",
+    "detail": "revenue owner 'Das, Selvaraj' vs tax assessee 'Saraswathi Reddy'"
+   },
+   {
+    "parcel_id": "A00021",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00021",
+    "type": "owner",
+    "detail": "revenue owner 'S. Sharma' vs tax assessee 'Ramesh Reddy'"
+   },
+   {
+    "parcel_id": "A00030",
+    "type": "owner",
+    "detail": "revenue owner 'Rahim Naidu' vs tax assessee 'Meenakshi Kumar'"
+   },
+   {
+    "parcel_id": "A00034",
+    "type": "owner",
+    "detail": "revenue owner 'Abdul Chettiar' vs tax assessee 'Arun Menon'"
+   },
+   {
+    "parcel_id": "A00036",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00044",
+    "type": "owner",
+    "detail": "revenue owner 'Abdul Sheikh' vs tax assessee 'Meenakshi Sheikh'"
+   },
+   {
+    "parcel_id": "A00066",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00071",
+    "type": "owner",
+    "detail": "revenue owner 'Rahim Reddy' vs tax assessee 'Krishnan Mudaliar'"
+   },
+   {
+    "parcel_id": "A00078",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00083",
+    "type": "owner",
+    "detail": "revenue owner 'Muthusamy Reddy' vs tax assessee 'Kannan Babu'"
+   },
+   {
+    "parcel_id": "A00084",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00084",
+    "type": "owner",
+    "detail": "revenue owner 'Ramesh Sheikh' vs tax assessee 'PARVATHI MURTHY'"
+   },
+   {
+    "parcel_id": "A00086",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00087",
+    "type": "land_use",
+    "detail": "tax usage Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00090",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00091",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00097",
+    "type": "area",
+    "detail": "recorded 210 m\u00b2 vs surveyed 160 m\u00b2"
+   },
+   {
+    "parcel_id": "A00099",
+    "type": "area",
+    "detail": "recorded 156 m\u00b2 vs surveyed 119 m\u00b2"
+   },
+   {
+    "parcel_id": "A00109",
+    "type": "owner",
+    "detail": "revenue owner 'Rao Deepak' vs tax assessee 'Mohammed Menon'"
+   },
+   {
+    "parcel_id": "A00116",
+    "type": "owner",
+    "detail": "revenue owner 'Fathima Raman' vs tax assessee 'Balasubramanian Khan'"
+   },
+   {
+    "parcel_id": "A00116",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00126",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00140",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00144",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00144",
+    "type": "owner",
+    "detail": "revenue owner 'PARVATHI SHARMA' vs tax assessee 'Rahim Chettiar'"
+   },
+   {
+    "parcel_id": "A00146",
+    "type": "owner",
+    "detail": "revenue owner 'V. Naidu' vs tax assessee 'Ramesh Das'"
+   },
+   {
+    "parcel_id": "A00151",
+    "type": "area",
+    "detail": "recorded 123 m\u00b2 vs surveyed 192 m\u00b2"
+   },
+   {
+    "parcel_id": "A00159",
+    "type": "area",
+    "detail": "recorded 128 m\u00b2 vs surveyed 211 m\u00b2"
+   },
+   {
+    "parcel_id": "A00160",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00167",
+    "type": "owner",
+    "detail": "revenue owner 'Ramasamy Menon' vs tax assessee 'wijayalakshmi Menon'"
+   },
+   {
+    "parcel_id": "A00177",
+    "type": "owner",
+    "detail": "revenue owner 'Mohammed Raman' vs tax assessee 'Anitha Khan'"
+   },
+   {
+    "parcel_id": "A00180",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00181",
+    "type": "owner",
+    "detail": "revenue owner 'Lakshmi Pillai' vs tax assessee 'Mohammed Raman'"
+   },
+   {
+    "parcel_id": "A00185",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00193",
+    "type": "land_use",
+    "detail": "tax usage Residential, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00198",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00199",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00209",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00212",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00223",
+    "type": "area",
+    "detail": "recorded 231 m\u00b2 vs surveyed 355 m\u00b2"
+   },
+   {
+    "parcel_id": "A00223",
+    "type": "land_use",
+    "detail": "tax usage Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00224",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00225",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00226",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00234",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00245",
+    "type": "owner",
+    "detail": "revenue owner 'Annamalai Chettiar' vs tax assessee 'Chandrasekar Nair'"
+   },
+   {
+    "parcel_id": "A00277",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00281",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00285",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00295",
+    "type": "owner",
+    "detail": "cadastral owner 'Annamalai Das' vs tax assessee 'Subramanian Iyer'"
+   },
+   {
+    "parcel_id": "A00299",
+    "type": "owner",
+    "detail": "revenue owner 'Janaki Sheikh' vs tax assessee 'Gopalakrishnan Nair'"
+   },
+   {
+    "parcel_id": "A00322",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00322",
+    "type": "owner",
+    "detail": "revenue owner 'Selvaraj Thevar' vs tax assessee 'Abdul Menon'"
+   },
+   {
+    "parcel_id": "A00328",
+    "type": "owner",
+    "detail": "revenue owner 'Lakshmi Pillai' vs tax assessee 'Janaki Sharma'"
+   },
+   {
+    "parcel_id": "A00330",
+    "type": "area",
+    "detail": "recorded 50 m\u00b2 vs surveyed 88 m\u00b2"
+   },
+   {
+    "parcel_id": "A00339",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00343",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00350",
+    "type": "owner",
+    "detail": "revenue owner 'FATHIMA CHETTIAR' vs tax assessee 'Janaki Reddy'"
+   },
+   {
+    "parcel_id": "A00352",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00373",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00376",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00379",
+    "type": "owner",
+    "detail": "revenue owner 'Balasubarmanian Shetty' vs tax assessee 'Mohammed Iyer'"
+   },
+   {
+    "parcel_id": "A00389",
+    "type": "area",
+    "detail": "recorded 111 m\u00b2 vs surveyed 151 m\u00b2"
+   },
+   {
+    "parcel_id": "A00399",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00406",
+    "type": "owner",
+    "detail": "revenue owner 'Parvathi Khan' vs tax assessee 'Krishnan Rao'"
+   },
+   {
+    "parcel_id": "A00407",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Raman' vs tax assessee 'Annamalai Thevar'"
+   },
+   {
+    "parcel_id": "A00408",
+    "type": "owner",
+    "detail": "revenue owner 'L. Gounder' vs tax assessee 'Rajeshwari Murthy'"
+   },
+   {
+    "parcel_id": "A00416",
+    "type": "owner",
+    "detail": "revenue owner 'Meenakshi Raman' vs tax assessee 'Deepak Chettiar'"
+   },
+   {
+    "parcel_id": "A00417",
+    "type": "owner",
+    "detail": "revenue owner 'Parvathi Raman' vs tax assessee 'Abdul Mudaliar'"
+   },
+   {
+    "parcel_id": "A00418",
+    "type": "owner",
+    "detail": "revenue owner 'Menon, Vijayalakshmi' vs tax assessee 'Janaki Das'"
+   },
+   {
+    "parcel_id": "A00432",
+    "type": "area",
+    "detail": "recorded 136 m\u00b2 vs surveyed 214 m\u00b2"
+   },
+   {
+    "parcel_id": "A00437",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00440",
+    "type": "land_use",
+    "detail": "tax usage Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00443",
+    "type": "owner",
+    "detail": "revenue owner 'Anitha Babu' vs tax assessee 'KANNAN MURTHY'"
+   },
+   {
+    "parcel_id": "A00445",
+    "type": "owner",
+    "detail": "revenue owner 'Fatima Kumar' vs tax assessee 'Meenakshi Chettiar'"
+   },
+   {
+    "parcel_id": "A00454",
+    "type": "owner",
+    "detail": "revenue owner 'Sharma, Annamalai' vs tax assessee 'Janaki Sheikh'"
+   },
+   {
+    "parcel_id": "A00458",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00461",
+    "type": "area",
+    "detail": "recorded 2430 m\u00b2 vs surveyed 1971 m\u00b2"
+   },
+   {
+    "parcel_id": "A00461",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00461",
+    "type": "owner",
+    "detail": "revenue owner 'Fathima Naidu' vs tax assessee 'Venkatesh Babu'"
+   },
+   {
+    "parcel_id": "A00468",
+    "type": "area",
+    "detail": "recorded 282 m\u00b2 vs surveyed 178 m\u00b2"
+   },
+   {
+    "parcel_id": "A00474",
+    "type": "owner",
+    "detail": "revenue owner 'Sundaram Khan' vs tax assessee 'Chandrasekar Naidu'"
+   },
+   {
+    "parcel_id": "A00474",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00485",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00503",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00525",
+    "type": "owner",
+    "detail": "revenue owner 'Selvaraj Pillai' vs tax assessee 'Sheikh, Anitha'"
+   },
+   {
+    "parcel_id": "A00527",
+    "type": "owner",
+    "detail": "revenue owner 'Venkatesh Das' vs tax assessee 'Ramesh Das'"
+   },
+   {
+    "parcel_id": "A00531",
+    "type": "area",
+    "detail": "recorded 98 m\u00b2 vs surveyed 131 m\u00b2"
+   },
+   {
+    "parcel_id": "A00532",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00536",
+    "type": "owner",
+    "detail": "revenue owner 'Arun Mudaliar' vs cadastral 'Saraswathi Pillai'"
+   },
+   {
+    "parcel_id": "A00537",
+    "type": "owner",
+    "detail": "revenue owner 'Muthusamy Mudaliar' vs tax assessee 'Sundaram Raman'"
+   },
+   {
+    "parcel_id": "A00553",
+    "type": "owner",
+    "detail": "revenue owner 'Lakshmi Menon' vs tax assessee 'Suresh Pillai'"
+   },
+   {
+    "parcel_id": "A00555",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00555",
+    "type": "owner",
+    "detail": "revenue owner 'Priya Gounder' vs tax assessee 'Ramesh Kumar'"
+   },
+   {
+    "parcel_id": "A00560",
+    "type": "owner",
+    "detail": "revenue owner 'Priya Kumar' vs tax assessee 'Meenakshi Sheikh'"
+   },
+   {
+    "parcel_id": "A00581",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00582",
+    "type": "area",
+    "detail": "recorded 709 m\u00b2 vs surveyed 498 m\u00b2"
+   },
+   {
+    "parcel_id": "A00582",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00584",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00586",
+    "type": "area",
+    "detail": "recorded 67 m\u00b2 vs surveyed 103 m\u00b2"
+   },
+   {
+    "parcel_id": "A00596",
+    "type": "owner",
+    "detail": "revenue owner 'Abdul Sharma' vs tax assessee 'Meenakshi Iyer'"
+   },
+   {
+    "parcel_id": "A00600",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00601",
+    "type": "owner",
+    "detail": "revenue owner 'Sundaram Pillai' vs tax assessee 'Priya Babu'"
+   },
+   {
+    "parcel_id": "A00614",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00622",
+    "type": "owner",
+    "detail": "revenue owner 'Anitha Nair' vs cadastral 'Fathima Shetty'"
+   },
+   {
+    "parcel_id": "A00626",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00627",
+    "type": "owner",
+    "detail": "revenue owner 'Pillai, Rajeshwari' vs tax assessee 'Venkatesh Menon'"
+   },
+   {
+    "parcel_id": "A00633",
+    "type": "owner",
+    "detail": "revenue owner 'Ramasamy Gooonder' vs tax assessee 'Janaki Das'"
+   },
+   {
+    "parcel_id": "A00633",
+    "type": "land_use",
+    "detail": "tax usage Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00636",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00637",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Sharma' vs tax assessee 'Chandrasekar seikh'"
+   },
+   {
+    "parcel_id": "A00642",
+    "type": "owner",
+    "detail": "revenue owner 'PRIYA SHEIKH' vs tax assessee 'Krishnan Thevar'"
+   },
+   {
+    "parcel_id": "A00645",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00651",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00668",
+    "type": "owner",
+    "detail": "revenue owner 'GOPALAKRISHNAN GOUNDER' vs tax assessee 'Suresh Pillai'"
+   },
+   {
+    "parcel_id": "A00672",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00677",
+    "type": "owner",
+    "detail": "revenue owner 'Ramesh Khan' vs tax assessee 'Balasubramanian Menon'"
+   },
+   {
+    "parcel_id": "A00678",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Murthy' vs tax assessee 'Chandrasekar Das'"
+   },
+   {
+    "parcel_id": "A00685",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00706",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Khan' vs tax assessee 'Venkatesh Gounder'"
+   },
+   {
+    "parcel_id": "A00707",
+    "type": "owner",
+    "detail": "revenue owner 'Rahim Kumar' vs tax assessee 'Subramanian Mudaliar'"
+   },
+   {
+    "parcel_id": "A00717",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00717",
+    "type": "owner",
+    "detail": "revenue owner 'Rajeshwari Murthy' vs tax assessee 'Mohammed Rao'"
+   },
+   {
+    "parcel_id": "A00723",
+    "type": "owner",
+    "detail": "revenue owner 'Gopalakrishnan Pillai' vs tax assessee 'Meenakshi Das'"
+   },
+   {
+    "parcel_id": "A00726",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00730",
+    "type": "owner",
+    "detail": "revenue owner 'Reddy, Mohammed' vs tax assessee 'Krishnan Raman'"
+   },
+   {
+    "parcel_id": "A00742",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00744",
+    "type": "area",
+    "detail": "recorded 134 m\u00b2 vs surveyed 84 m\u00b2"
+   },
+   {
+    "parcel_id": "A00748",
+    "type": "area",
+    "detail": "recorded 80 m\u00b2 vs surveyed 122 m\u00b2"
+   },
+   {
+    "parcel_id": "A00748",
+    "type": "owner",
+    "detail": "revenue owner 'Sundaram Murthy' vs tax assessee 'Rajeshwari Murthy'"
+   },
+   {
+    "parcel_id": "A00752",
+    "type": "area",
+    "detail": "recorded 162 m\u00b2 vs surveyed 239 m\u00b2"
+   },
+   {
+    "parcel_id": "A00752",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00756",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A00772",
+    "type": "owner",
+    "detail": "revenue owner 'Gopalakrishnan Nair' vs tax assessee 'Parvtahi Mudaliar'"
+   },
+   {
+    "parcel_id": "A00773",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00789",
+    "type": "area",
+    "detail": "recorded 125 m\u00b2 vs surveyed 178 m\u00b2"
+   },
+   {
+    "parcel_id": "A00791",
+    "type": "owner",
+    "detail": "revenue owner 'Abdul Mudaliar' vs tax assessee 'Deepak Iyer'"
+   },
+   {
+    "parcel_id": "A00795",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00809",
+    "type": "owner",
+    "detail": "revenue owner 'Thiruvengadam Shetty' vs tax assessee 'Suresh Raman'"
+   },
+   {
+    "parcel_id": "A00819",
+    "type": "owner",
+    "detail": "revenue owner 'Lakshmi Sharma' vs tax assessee 'Arun Khan'"
+   },
+   {
+    "parcel_id": "A00823",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A00841",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00853",
+    "type": "owner",
+    "detail": "revenue owner 'Balasubramanian Nair' vs tax assessee 'R. Chettiar'"
+   },
+   {
+    "parcel_id": "A00857",
+    "type": "owner",
+    "detail": "revenue owner 'Fatihma Khan' vs tax assessee 'Muthusamy Das'"
+   },
+   {
+    "parcel_id": "A00860",
+    "type": "owner",
+    "detail": "revenue owner 'Suresh Rao' vs tax assessee 'Sundaram Sharma'"
+   },
+   {
+    "parcel_id": "A00891",
+    "type": "area",
+    "detail": "recorded 69 m\u00b2 vs surveyed 107 m\u00b2"
+   },
+   {
+    "parcel_id": "A00899",
+    "type": "owner",
+    "detail": "cadastral owner 'Krishnan Pillai' vs tax assessee 'Fathima Sharma'"
+   },
+   {
+    "parcel_id": "A00903",
+    "type": "area",
+    "detail": "recorded 280 m\u00b2 vs surveyed 463 m\u00b2"
+   },
+   {
+    "parcel_id": "A00912",
+    "type": "owner",
+    "detail": "revenue owner 'Priya Babu' vs tax assessee 'Gopalakrishnan Iyer'"
+   },
+   {
+    "parcel_id": "A00921",
+    "type": "area",
+    "detail": "recorded 147 m\u00b2 vs surveyed 113 m\u00b2"
+   },
+   {
+    "parcel_id": "A00928",
+    "type": "area",
+    "detail": "recorded 227 m\u00b2 vs surveyed 174 m\u00b2"
+   },
+   {
+    "parcel_id": "A00928",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00928",
+    "type": "owner",
+    "detail": "revenue owner 'Balasubramanian Murthy' vs cadastral 'Gopalakrishnan Murthy'"
+   },
+   {
+    "parcel_id": "A00945",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00946",
+    "type": "area",
+    "detail": "recorded 592 m\u00b2 vs surveyed 408 m\u00b2"
+   },
+   {
+    "parcel_id": "A00948",
+    "type": "area",
+    "detail": "recorded 80 m\u00b2 vs surveyed 130 m\u00b2"
+   },
+   {
+    "parcel_id": "A00955",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00957",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00962",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00972",
+    "type": "owner",
+    "detail": "revenue owner 'Krishnan Pillai' vs tax assessee 'Das Meenakshi'"
+   },
+   {
+    "parcel_id": "A00989",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A00994",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Das' vs tax assessee 'Ramasamy Menon'"
+   },
+   {
+    "parcel_id": "A01006",
+    "type": "owner",
+    "detail": "revenue owner 'Parvathi Rao' vs tax assessee 'Priya Gounder'"
+   },
+   {
+    "parcel_id": "A01013",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01016",
+    "type": "owner",
+    "detail": "revenue owner 'Ramesh Khan' vs tax assessee 'Parvathi Kumar'"
+   },
+   {
+    "parcel_id": "A01019",
+    "type": "area",
+    "detail": "recorded 136 m\u00b2 vs surveyed 230 m\u00b2"
+   },
+   {
+    "parcel_id": "A01028",
+    "type": "owner",
+    "detail": "revenue owner 'Muthusamy Rao' vs tax assessee 'Gopalakrishnan Murthy'"
+   },
+   {
+    "parcel_id": "A01031",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01034",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A01073",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Mixed"
+   },
+   {
+    "parcel_id": "A01078",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01084",
+    "type": "owner",
+    "detail": "revenue owner 'Annamalai Naidu' vs tax assessee 'Venkatesh Reddy'"
+   },
+   {
+    "parcel_id": "A01087",
+    "type": "land_use",
+    "detail": "revenue says Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A01093",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01095",
+    "type": "area",
+    "detail": "recorded 276 m\u00b2 vs surveyed 174 m\u00b2"
+   },
+   {
+    "parcel_id": "A01100",
+    "type": "owner",
+    "detail": "cadastral owner 'Vijayalakshmi Murthy' vs tax assessee 'Sundaram Nair'"
+   },
+   {
+    "parcel_id": "A01113",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01115",
+    "type": "owner",
+    "detail": "revenue owner 'Murthy, Lakshmi' vs tax assessee 'Saraswathi Kumar'"
+   },
+   {
+    "parcel_id": "A01118",
+    "type": "owner",
+    "detail": "revenue owner 'Rahim Guonder' vs tax assessee 'Meenakshi Das'"
+   },
+   {
+    "parcel_id": "A01122",
+    "type": "land_use",
+    "detail": "tax usage Residential, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A01129",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A01141",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01154",
+    "type": "owner",
+    "detail": "revenue owner 'Priya Das' vs tax assessee 'Rajeshwari Mudaliar'"
+   },
+   {
+    "parcel_id": "A01155",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01158",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01163",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A01170",
+    "type": "area",
+    "detail": "recorded 525 m\u00b2 vs surveyed 361 m\u00b2"
+   },
+   {
+    "parcel_id": "A01188",
+    "type": "owner",
+    "detail": "revenue owner 'Rahim Kumar' vs tax assessee 'Fathima Pillai'"
+   },
+   {
+    "parcel_id": "A01192",
+    "type": "owner",
+    "detail": "revenue owner 'Subramanian Reddy' vs tax assessee 'P. Shetty'"
+   },
+   {
+    "parcel_id": "A01196",
+    "type": "owner",
+    "detail": "cadastral owner 'Rajeshwari Mudaliar' vs tax assessee 'Venkatesh Chettiar'"
+   },
+   {
+    "parcel_id": "A01197",
+    "type": "owner",
+    "detail": "revenue owner 'Janaki Gounder' vs tax assessee 'Lakshmi Shetty'"
+   },
+   {
+    "parcel_id": "A01210",
+    "type": "owner",
+    "detail": "revenue owner 'SELVARAJ BABU' vs tax assessee 'Lakshmi Babu'"
+   },
+   {
+    "parcel_id": "A01217",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Mudaliar' vs tax assessee 'Deepak Raman'"
+   },
+   {
+    "parcel_id": "A01228",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01229",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Khan' vs tax assessee 'Rahim Shetty'"
+   },
+   {
+    "parcel_id": "A01230",
+    "type": "owner",
+    "detail": "revenue owner 'Thiruvengadam Sharma' vs tax assessee 'Meenakshi Nair'"
+   },
+   {
+    "parcel_id": "A01231",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Raman' vs tax assessee 'Suresh Mudaliar'"
+   },
+   {
+    "parcel_id": "A01237",
+    "type": "area",
+    "detail": "recorded 128 m\u00b2 vs surveyed 226 m\u00b2"
+   },
+   {
+    "parcel_id": "A01238",
+    "type": "land_use",
+    "detail": "tax usage Mixed, cadastral says Commercial"
+   },
+   {
+    "parcel_id": "A01246",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01257",
+    "type": "owner",
+    "detail": "revenue owner 'Rahim Reddy' vs tax assessee 'Parvathi Rao'"
+   },
+   {
+    "parcel_id": "A01265",
+    "type": "owner",
+    "detail": "revenue owner 'Sundaram Sheikh' vs tax assessee 'Annamalai Iyer'"
+   },
+   {
+    "parcel_id": "A01271",
+    "type": "area",
+    "detail": "recorded 84 m\u00b2 vs surveyed 119 m\u00b2"
+   },
+   {
+    "parcel_id": "A01284",
+    "type": "land_use",
+    "detail": "tax usage Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01286",
+    "type": "land_use",
+    "detail": "revenue says Mixed, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01288",
+    "type": "owner",
+    "detail": "revenue owner 'Ramasamy Shetty' vs tax assessee 'Rajeshwari Menon'"
+   },
+   {
+    "parcel_id": "A01295",
+    "type": "land_use",
+    "detail": "revenue says Commercial, cadastral says Residential"
+   },
+   {
+    "parcel_id": "A01301",
+    "type": "owner",
+    "detail": "revenue owner 'Vijayalakshmi Shetty' vs tax assessee 'Rahim Thevar'"
+   },
+   {
+    "parcel_id": "A01319",
+    "type": "owner",
+    "detail": "revenue owner 'Kumar, Lakshmi' vs tax assessee 'Ramesh Babu'"
+   },
+   {
+    "parcel_id": "A01320",
+    "type": "owner",
+    "detail": "revenue owner 'Venkatesh Gounder' vs tax assessee 'Lakhsmi Thevar'"
+   },
+   {
+    "parcel_id": "A01322",
+    "type": "owner",
+    "detail": "revenue owner 'Deepak Nair' vs tax assessee 'Meenakshi Naidu'"
+   },
+   {
+    "parcel_id": "A01333",
+    "type": "area",
+    "detail": "recorded 502 m\u00b2 vs surveyed 368 m\u00b2"
+   },
+   {
+    "parcel_id": "A01340",
+    "type": "owner",
+    "detail": "revenue owner 'Abdul Murthy' vs tax assessee 'Thiruvengadam Mudaliar'"
+   }
+  ]
+ },
+ "confidence": {
+  "bands": {
+   "High": 1126,
+   "Low": 164,
+   "Medium": 66
+  },
+  "histogram": [
+   160,
+   0,
+   0,
+   0,
+   2,
+   2,
+   16,
+   41,
+   205,
+   930
+  ],
+  "mean": 82.46460176991151,
+  "formula": "100 x spatial (calibrated link probability) x source reliability x topology factor x attribute factor"
+ }
+}

@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review queue · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  html, body { height: 100%; }
+  body { display: grid; grid-template-rows: auto auto 1fr; }
+  .subbar { display: flex; align-items: center; gap: 22px; padding: 8px 18px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #kpis { display: flex; gap: 22px; flex: 1; flex-wrap: wrap; }
+  .kpi b { display: block; font-size: 16px; }
+  .kpi span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .subbar label { font-size: 12px; color: var(--muted); }
+  .sw { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+  main { display: grid; grid-template-columns: 340px minmax(0, 1fr) 360px; gap: 12px; padding: 12px; min-height: 0; }
+  aside, #mapwrap { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); min-height: 0; overflow: hidden; }
+  #queue { display: grid; grid-template-rows: auto 1fr auto; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tab { flex: 1; padding: 10px 4px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font-size: 12px; }
+  .tab b { display: block; font-size: 15px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
+  ul#list { list-style: none; margin: 0; padding: 0; overflow: auto; }
+  ul#list li { padding: 10px 14px; border-bottom: 1px solid #efede7; cursor: pointer; display: grid; gap: 4px; }
+  ul#list li:hover { background: #faf9f6; }
+  ul#list li[aria-current="true"] { background: #eaf3f1; box-shadow: inset 3px 0 0 var(--accent); }
+  .row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .ids { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .pbar { height: 5px; border-radius: 3px; background: #ece9e1; overflow: hidden; }
+  .pbar i { display: block; height: 100%; background: var(--warn); }
+  #audit { border-top: 1px solid var(--line); padding: 10px 14px; font-size: 12px; color: var(--muted); }
+  #audit b.ok { color: var(--good); } #audit b.bad { color: var(--bad); }
+  #mapwrap { position: relative; }
+  #map { position: absolute; inset: 0; background: #ece9e0; }
+  #legend { position: absolute; left: 12px; bottom: 12px; z-index: 500; background: rgba(255,255,255,.94); border: 1px solid var(--line);
+            border-radius: 8px; padding: 8px 10px; font-size: 12px; display: grid; gap: 4px; }
+  #legend label { display: flex; gap: 6px; align-items: center; color: var(--muted); margin-top: 4px; }
+  #detail { overflow: auto; padding: 16px; display: grid; align-content: start; gap: 14px; }
+  h2 { margin: 0; font-size: 16px; font-variant-numeric: tabular-nums; }
+  h3 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+  .pbig { font-size: 38px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .meter { position: relative; display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
+  .meter i:nth-child(1) { background: #e8d4d4; } .meter i:nth-child(2) { background: #f1dfb4; } .meter i:nth-child(3) { background: #bfe1cd; }
+  .mark { position: absolute; top: -3px; width: 3px; height: 14px; background: var(--ink); border-radius: 2px; transform: translateX(-1px); }
+  .scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 4px 0; border-bottom: 1px solid #f0eee8; } td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .why { display: grid; gap: 6px; }
+  .why div { display: grid; grid-template-columns: 1fr 90px; gap: 8px; align-items: center; font-size: 12px; }
+  .why .bar { height: 8px; background: #f0eee8; border-radius: 4px; position: relative; }
+  .why .bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  textarea { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; resize: vertical; min-height: 44px; }
+  .truth { padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+  .truth.yes { background: #dff1e6; color: #1f6b43; } .truth.no { background: #f6dede; color: #8c2b2b; }
+  .msg { font-size: 12px; min-height: 18px; margin-top: 6px; color: var(--muted); } .msg.err { color: var(--bad); font-weight: 600; }
+  .dsw { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .dsw button { border: 0; background: none; padding: 6px 10px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+  .dsw button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  dialog { border: 1px solid var(--line); border-radius: 12px; max-width: 560px; padding: 20px 22px; }
+  dialog::backdrop { background: rgba(20,25,35,.35); }
+  dialog ul { padding-left: 18px; } dialog li { margin: 4px 0; }
+  kbd { font: 11px ui-monospace, monospace; background: #f0eee8; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+  @media (max-width: 1100px) { body { display: block; } main { display: flex; flex-direction: column; height: auto; }
+    #mapwrap { height: 55vh; } #queue { max-height: 50vh; } }
+
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="subbar">
+  <div id="kpis"></div>
+  <div class="dsw" id="dsw" role="group" aria-label="Data shown"></div>
+  <button class="btn" id="aboutBtn">About this data</button>
+  <label><input type="checkbox" id="truthToggle"> Reveal ground truth (demo)</label>
+</div>
+<main>
+  <aside id="queue" aria-label="Work queue">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <ul id="list" role="listbox" aria-label="Items"></ul>
+    <div id="audit">Audit log: loading…</div>
+  </aside>
+  <section id="mapwrap" aria-label="Map">
+    <div id="map"></div>
+    <div id="legend"></div>
+  </section>
+  <aside id="detail" aria-live="polite"></aside>
+</main>
+<dialog id="about"><div id="aboutBody"></div><p style="text-align:right;margin:12px 0 0"><button class="btn primary" id="aboutClose">Close</button></p></dialog>
+
+<script src="vendor/leaflet.js"></script>
+<script src="assets/common.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("review.html");
+const DS = dataset();                       // "synthetic" or "real", from ?data= or the last choice
+const Q = DS === "real" ? "dataset=real" : "dataset=synthetic";
+
+const S = { sum: null, layers: null, pairs: [], byKey: new Map(), decisions: new Map(), log: [], tab: "review",
+            sel: null, selUnmatched: null, truth: null, showTruth: false, layerA: new Map(), layerB: new Map(), hi: null };
+
+const revs = (a, b) => S.log.filter((d) => d.a_id === a && d.b_id === b).length;
+
+/* ---------- map ---------- */
+const map = L.map("map", { preferCanvas: true, zoomSnap: 0.25, attributionControl: false, zoomControl: true });
+let tiles = null;
+const STY = {
+  auto: { color: STATUS.auto.stroke, weight: 1, fillColor: STATUS.auto.color, fillOpacity: 0.2 },
+  review: { color: STATUS.review.stroke, weight: 2, fillColor: STATUS.review.color, fillOpacity: 0.65 },
+  unmatched: { color: STATUS.unmatched.stroke, weight: 1, fillColor: STATUS.unmatched.color, fillOpacity: 0.18 },
+};
+const styleA = (f) => STY[f.properties.status];
+const styleB = () => ({ color: "#d9730d", weight: 1.2, dashArray: "4 3", fillOpacity: 0 });
+
+function bestPairFor(side, id) {
+  const c = S.pairs.filter((p) => p[side] === id);
+  c.sort((x, y) => (x.bucket === "review" ? -1 : 0) - (y.bucket === "review" ? -1 : 0) || y.p - x.p);
+  return c[0];
+}
+function buildMap() {
+  const onA = (f, l) => { S.layerA.set(f.properties.id, l); l.on("click", () => clickParcel("a", f.properties.id)); };
+  const onB = (f, l) => { S.layerB.set(f.properties.id, l); l.on("click", () => clickParcel("b", f.properties.id)); };
+  const ga = L.geoJSON(S.layers.A, { style: styleA, onEachFeature: onA }).addTo(map);
+  L.geoJSON(S.layers.B, { style: styleB, onEachFeature: onB }).addTo(map);
+  map.fitBounds(ga.getBounds());
+}
+function clickParcel(side, id) {
+  const p = bestPairFor(side, id);
+  if (p) { setTab(p.bucket === "review" && !S.decisions.has(key(p.a, p.b)) ? "review" : S.tab === "decided" ? "decided" : "auto", false); selectPair(p); }
+  else if (side === "a") { setTab("unmatched", false); selectUnmatched(id); }
+}
+function highlight(aId, bId) {
+  if (S.hi) { map.removeLayer(S.hi); S.hi = null; }
+  const feats = [];
+  const fa = S.layers.A.features.find((f) => f.properties.id === aId);
+  const fb = bId && S.layers.B.features.find((f) => f.properties.id === bId);
+  if (fa) feats.push({ ...fa, properties: { ...fa.properties, side: "a" } });
+  if (fb) feats.push({ ...fb, properties: { ...fb.properties, side: "b" } });
+  S.hi = L.geoJSON({ type: "FeatureCollection", features: feats }, {
+    interactive: false,
+    style: (f) => f.properties.side === "a" ? { color: "#1f4fd8", weight: 3, fillColor: "#1f4fd8", fillOpacity: 0.3 }
+                                           : { color: "#ff6a00", weight: 3, fillColor: "#ff6a00", fillOpacity: 0.2, dashArray: "6 3" },
+  }).addTo(map);
+  map.fitBounds(S.hi.getBounds().pad(2.2), { maxZoom: 20, animate: true });
+}
+
+/* ---------- lists ---------- */
+function itemsFor(tab) {
+  if (tab === "review") return S.pairs.filter((p) => p.bucket === "review" && !S.decisions.has(key(p.a, p.b)))
+    .sort((x, y) => Math.abs(x.p - 0.5) - Math.abs(y.p - 0.5));
+  if (tab === "auto") return S.pairs.filter((p) => p.bucket === "accept" && !S.decisions.has(key(p.a, p.b))).sort((x, y) => x.p - y.p);
+  if (tab === "decided") return [...S.decisions.values()].sort((x, y) => y.seq - x.seq).map((d) => ({ ...S.byKey.get(key(d.a_id, d.b_id)), decision: d }));
+  return S.layers.A.features.filter((f) => f.properties.status === "unmatched").map((f) => ({ unmatched: f.properties }));
+}
+function setTab(t, render = true) {
+  S.tab = t;
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === t)));
+  if (render) { renderList(); }
+  else renderList();
+}
+function renderTabs() {
+  const tabs = $("tabs"); tabs.textContent = "";
+  const defs = [["review", "Review"], ["auto", "Auto"], ["unmatched", "Unmatched"], ["decided", "Decided"]];
+  for (const [id, name] of defs) {
+    const b = el("button", "tab"); b.dataset.tab = id; b.setAttribute("role", "tab");
+    b.append(el("b", "", String(itemsFor(id).length)), document.createTextNode(name));
+    b.addEventListener("click", () => { setTab(id); const f = itemsFor(id)[0]; if (f) pick(f); });
+    tabs.append(b);
+  }
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === S.tab)));
+}
+function reasonOf(p) { return `${p.centroid.toFixed(1)} m apart · overlap ${p.iou.toFixed(2)} · area ${p.area_ratio.toFixed(2)}`; }
+function renderList() {
+  renderTabs();
+  const list = $("list"); list.textContent = "";
+  const items = itemsFor(S.tab);
+  if (!items.length) {
+    list.append(el("li", "empty", S.tab === "review" ? "Review queue is clear. Every remaining link was resolved automatically." : "Nothing here."));
+    return;
+  }
+  for (const it of items.slice(0, 400)) {
+    const li = el("li"); li.tabIndex = 0; li.setAttribute("role", "option");
+    if (it.unmatched) {
+      const r = el("div", "row"); r.append(el("span", "ids", it.unmatched.id), el("span", "sub", it.unmatched.owner));
+      li.append(r, el("div", "sub", "No candidate above the review threshold"));
+      if (S.selUnmatched === it.unmatched.id) li.setAttribute("aria-current", "true");
+    } else {
+      const r = el("div", "row"); r.append(el("span", "ids", `${it.a} ↔ ${it.b}`), el("span", "sub", pct(it.p, 0)));
+      const bar = el("div", "pbar"); const i = el("i"); i.style.width = pct(it.p, 0); i.style.background = it.bucket === "accept" ? "var(--good)" : "var(--warn)"; bar.append(i);
+      li.append(r, bar, el("div", "sub", it.decision ? `${it.decision.decision === "accept" ? "Accepted" : "Rejected"} by ${it.decision.officer}${revs(it.a, it.b) > 1 ? " · revised " + (revs(it.a, it.b) - 1) + "×" : ""}` : reasonOf(it)));
+      if (S.sel && S.sel.a === it.a && S.sel.b === it.b) li.setAttribute("aria-current", "true");
+    }
+    li.addEventListener("click", () => pick(it));
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter") pick(it); });
+    list.append(li);
+  }
+  const cur = list.querySelector('[aria-current="true"]'); if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+function pick(it) { if (it.unmatched) selectUnmatched(it.unmatched.id); else selectPair(it); }
+
+/* ---------- detail ---------- */
+const thrOf = (p) => ({ lo: p.t_lo ?? S.sum.thresholds.reject_below, hi: p.t_hi ?? S.sum.thresholds.accept_at_or_above });
+function meter(p, pair) {
+  const { lo, hi } = thrOf(pair);
+  const m = el("div", "meter");
+  for (const w of [lo, hi - lo, 1 - hi]) { const i = el("i"); i.style.width = w * 100 + "%"; m.append(i); }
+  const mk = el("span", "mark"); mk.style.left = p * 100 + "%"; m.append(mk);
+  const sc = el("div", "scale"); sc.append(el("span", "", "likely not a link"), el("span", "", "needs a person"), el("span", "", "auto-accept"));
+  const w = el("div"); w.append(m, sc); return w;
+}
+function selectPair(p) {
+  S.sel = p; S.selUnmatched = null; highlight(p.a, p.b); renderList(); renderPairDetail(p);
+}
+function renderPairDetail(p) {
+  const d = $("detail"); d.textContent = "";
+  const dec = S.decisions.get(key(p.a, p.b));
+  const head = el("div"); head.append(el("h2", "", `${p.a} ↔ ${p.b}`));
+  const tags = el("div", "", ""); tags.style.marginTop = "4px";
+  tags.append(el("span", `tag ${p.bucket}`, p.bucket === "review" ? "Needs review" : p.auto_by === "overlap" ? "Auto-accepted (outline overlap)" : "Auto-accepted"));
+  if (dec) { tags.append(document.createTextNode(" "), el("span", "tag done", `${dec.decision === "accept" ? "Accepted" : "Rejected"} by ${dec.officer}`)); }
+  head.append(tags); d.append(head);
+
+  const conf = el("div"); conf.append(el("h3", "", "Calibrated match probability"));
+  const big = el("div", "pbig", pct(p.p, 0)); conf.append(big, meter(p.p, p));
+  const th = thrOf(p);
+  conf.append(el("div", "hint", DS === "real"
+    ? `Auto-linked when the model gives ≥ ${pct(th.hi, 0)} or the outlines overlap (IoU) ≥ ${S.sum.thresholds.iou_accept} after the map offset is removed. Checked against ${S.sum.metrics.labelled} hand-labelled pairs.`
+    : `This pair scored ${pct(p.p, 1)}. Auto-accept needs ≥ ${pct(th.hi, 1)} here (threshold from this pair's spatial fold, calibrated to ${pct(S.sum.target_auto_precision, 0)} precision on held-out data).`));
+  d.append(conf);
+
+  const ev = el("div"); ev.append(el("h3", "", "Evidence"));
+  const t = el("table");
+  const N = S.sum.names;
+  const rows = [["Overlap of outlines (IoU)", p.iou.toFixed(2)], ["Distance between centres", p.centroid.toFixed(1) + " m"],
+                ["Similarity of areas", p.area_ratio.toFixed(2)]];
+  if (p.name_sim != null) rows.push([`Owner (${N.a.toLowerCase()})`, p.owner_a], [`Owner (${N.b.toLowerCase()})`, p.owner_b],
+                                    ["Name similarity (shown, not scored)", pct(p.name_sim, 0)]);
+  for (const [k, v] of rows) {
+    const tr = el("tr"); tr.append(el("td", "", k), el("td", "", v)); t.append(tr);
+  }
+  ev.append(t); d.append(ev);
+
+  const why = el("div"); why.append(el("h3", "", "Why the model says this"));
+  const w = el("div", "why"); const mx = Math.max(...p.contrib.map((c) => Math.abs(c[1])), 1e-6);
+  for (const [f, v] of p.contrib) {
+    const lab = (LABELS[f] || f).replace("cadastral", S.sum.names.a === "Cadastral" ? "cadastral" : S.sum.names.a).replace("revenue", S.sum.names.a === "Cadastral" ? "revenue" : S.sum.names.b);
+    const r = el("div"); r.append(el("span", "", lab));
+    const bar = el("div", "bar"); const i = el("i"); const wpx = (Math.abs(v) / mx) * 50;
+    i.style.width = wpx + "%"; i.style.left = v >= 0 ? "50%" : 50 - wpx + "%"; i.style.background = v >= 0 ? "var(--good)" : "var(--bad)";
+    bar.append(i); r.append(bar); w.append(r);
+  }
+  why.append(w, el("div", "hint", "Bars to the right push toward “same parcel”, to the left away from it."));
+  d.append(why);
+
+  if (S.showTruth && S.truth) {
+    const k = key(p.a, p.b), yes = S.truth.links.includes(k);
+    if (DS === "real" && !S.truth.checked.includes(k)) d.append(el("div", "truth", "Not in the hand-checked sample."));
+    else d.append(el("div", `truth ${yes ? "yes" : "no"}`, DS === "real"
+      ? (yes ? "Hand check: the SAME building (checked against satellite imagery)." : "Hand check: NOT the same building.")
+      : (yes ? "Ground truth: this IS the same parcel." : "Ground truth: this is NOT the same parcel.")));
+  }
+
+  const act = el("div"); act.append(el("h3", "", dec ? "Officer decision (recorded)" : "Officer decision"));
+  if (dec && !S.me.can.override) {
+    act.append(el("p", "", `${dec.decision === "accept" ? "Accepted" : "Rejected"} by ${dec.officer}${dec.note ? ": " + dec.note : "."}`),
+               el("div", "hint", "Recorded decisions can only be changed by a supervisor."));
+    d.append(act); return;
+  }
+  const note = el("textarea"); note.id = "note";
+  note.placeholder = dec ? "Reason for changing the decision (required)" : "Optional note for the audit trail";
+  const row = el("div", "actions");
+  const ok = el("button", "btn primary"), no = el("button", "btn danger");
+  ok.id = "btnAccept"; no.id = "btnReject";
+  ok.textContent = dec ? (dec.decision === "accept" ? "Accepted ✓" : "Change to Accept") : "Accept link (A)";
+  no.textContent = dec ? (dec.decision === "reject" ? "Rejected ✓" : "Change to Reject") : "Reject link (R)";
+  if (dec && dec.decision === "accept") ok.disabled = true;
+  if (dec && dec.decision === "reject") no.disabled = true;
+  ok.addEventListener("click", () => decide(p, "accept")); no.addEventListener("click", () => decide(p, "reject"));
+  row.append(ok, no);
+  const msg = el("div", "msg"); msg.id = "msg";
+  act.append(note, row, msg, el("div", "hint", dec ? "A decision can be changed only with a written reason. Every change is kept in the audit log." : "J / K or ↓ / ↑ moves through the list."));
+  d.append(act);
+}
+function selectUnmatched(id) {
+  S.sel = null; S.selUnmatched = id; highlight(id, null); renderList();
+  const d = $("detail"); d.textContent = "";
+  const f = S.layers.A.features.find((x) => x.properties.id === id).properties;
+  d.append(el("h2", "", id), el("span", "tag review", "No counterpart found"));
+  d.append(el("p", "", DS === "real"
+    ? `No ${S.sum.names.b_long} scored above the review threshold. It may be missing from the ${S.sum.names.b} map, or traced as part of a larger shape (see Real data).`
+    : `Owner on record: ${f.owner}. No revenue-layer parcel scored above the review threshold, so this parcel is treated as absent from the revenue records.`));
+  d.append(el("p", "hint", "These are reported rather than force-matched, so no geometry is invented."));
+  if (S.showTruth && S.truth && DS !== "real") {
+    const t = S.truth.a_type[id];
+    d.append(el("div", `truth ${t === "missing" ? "yes" : "no"}`, t === "missing" ? "Ground truth: genuinely missing from the revenue layer." : `Ground truth: a counterpart existed (${t}). The model missed it.`));
+  }
+}
+
+/* ---------- decisions ---------- */
+function showMsg(text, err) { const m = $("msg"); if (m) { m.textContent = text; m.className = "msg" + (err ? " err" : ""); } }
+async function decide(p, decision) {
+  if (S.busy) return;
+  const cur = S.decisions.get(key(p.a, p.b));
+  const noteEl = $("note"), note = ((noteEl && noteEl.value) || "").trim();
+  if (cur && cur.decision === decision) { showMsg(`Already ${decision === "accept" ? "accepted" : "rejected"} by ${cur.officer}. Nothing changed.`); return; }
+  if (cur && !note) { showMsg("Add a reason in the note box to change an earlier decision.", true); if (noteEl) noteEl.focus(); return; }
+  S.busy = true; document.querySelectorAll("#detail .actions button").forEach((b) => (b.disabled = true));
+  try {
+    const r = await fetch("/api/decisions", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ a_id: p.a, b_id: p.b, decision, note, dataset: DS }) });
+    const e = await r.json();
+    if (!r.ok) throw new Error(e.detail || "Request failed");
+    if (!e.unchanged) { S.log.push(e); S.decisions.set(key(p.a, p.b), e); }
+    const next = cur ? null : itemsFor(S.tab)[0];
+    renderList(); refreshAudit(); renderKpis();
+    if (next && !next.decision && !next.unmatched) selectPair(next); else renderPairDetail(p);
+    showMsg(cur ? "Decision changed and logged." : "Decision logged.");
+  } catch (err) {
+    renderPairDetail(p); showMsg(err.message, true);
+  } finally { S.busy = false; }
+}
+async function refreshAudit() {
+  const v = await j("/api/verify"); const a = $("audit"); a.textContent = "";
+  a.append(document.createTextNode("Audit log · " + v.entries + (v.entries === 1 ? " entry · " : " entries · ")));
+  a.append(el("b", v.valid ? "ok" : "bad", v.valid ? "hash chain verified ✓" : "TAMPERING DETECTED at entry " + v.first_bad_seq));
+  if (v.head) a.append(el("div", "", "head " + v.head.slice(0, 16) + "…"));
+}
+
+/* ---------- header, legend, about ---------- */
+function renderKpis() {
+  const m = S.sum.metrics.model, k = $("kpis"); k.textContent = "";
+  const nm = DS === "real" ? "OSM buildings" : "cadastral parcels";
+  const precLabel = DS === "real" ? "auto-link precision (hand-checked)" : "auto-accept precision";
+  const pending = itemsFor("review").length;
+  const mine = S.log.filter((d) => d.user === S.me.username).length;
+  const tiles = S.me.role === "officer"
+    ? [[String(pending), "awaiting review"], [String(mine), "decisions by you"], [String(S.decisions.size), "links decided in total"],
+       [S.sum.n_cadastral.toLocaleString(), nm]]
+    : null;
+  if (tiles) { for (const [v, l] of tiles) { const d = el("div", "kpi"); d.append(el("b", "", v), el("span", "", l)); k.append(d); } return; }
+  for (const [v, l] of [[S.sum.n_cadastral.toLocaleString(), nm], [pct(m.auto_resolved_share), DS === "real" ? "linked without a person" : "resolved without a person"],
+                        [m.auto_precision == null ? "—" : pct(m.auto_precision), precLabel], [String(pending), "awaiting review"], [String(S.decisions.size), "links decided"]]) {
+    const d = el("div", "kpi"); d.append(el("b", "", v), el("span", "", l)); k.append(d);
+  }
+}
+function renderLegend() {
+  const g = $("legend"); g.textContent = "";
+  const add = (c, f, t, dash) => { const r = el("div"); const s = el("span", "sw"); s.style.border = `2px ${dash ? "dashed" : "solid"} ${c}`; s.style.background = f; r.append(s, document.createTextNode(t)); g.append(r); };
+  const N = S.sum.names;
+  add(STATUS.auto.stroke, "rgba(12,163,12,.2)", `${N.a} · auto-resolved`); add(STATUS.review.stroke, "rgba(250,178,25,.65)", `${N.a} · needs review`);
+  add(STATUS.unmatched.stroke, "rgba(154,152,143,.2)", `${N.a} · no counterpart`); add("#d9730d", "transparent", DS === "real" ? `${N.b} (offset removed)` : "Revenue layer", true);
+  const lab = el("label"); const cb = el("input"); cb.type = "checkbox";
+  lab.append(cb, document.createTextNode(DS === "real" ? "Satellite (needs internet)" : "Basemap (needs internet)")); g.append(lab);
+  const turnOn = () => {
+    tiles = DS === "real"
+      ? L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 20, maxNativeZoom: 19 })
+      : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
+    tiles.addTo(map); tiles.bringToBack();
+  };
+  cb.addEventListener("change", () => { if (cb.checked) turnOn(); else if (tiles) { map.removeLayer(tiles); tiles = null; } });
+  if (DS === "real") { cb.checked = true; turnOn(); }
+}
+function renderAbout() {
+  const b = $("aboutBody"); b.textContent = ""; b.append(el("h2", "", "About this data"));
+  if (DS === "real") {
+    const ul = el("ul"); for (const n of S.sum.notes) ul.append(el("li", "", n)); b.append(el("p", "", S.sum.source), ul);
+    const m = S.sum.metrics, t = el("table");
+    const f = (x) => (x == null ? "—" : pct(x));
+    for (const [k, a, c] of [["", "This console's rule", "Overlap only, no offset removal"], ["Auto-link precision", f(m.model.auto_precision), f(m.baseline.auto_precision)],
+        ["Auto-link recall", f(m.model.auto_recall), f(m.baseline.auto_recall)]]) {
+      const tr = el("tr"); tr.append(el("td", "", k), el("td", "", a), el("td", "", c)); t.append(tr);
+    }
+    b.append(t, el("p", "hint", `From ${m.labelled} pairs checked by hand against satellite imagery. Rule: ${S.sum.auto_rule}.`));
+    return;
+  }
+  const ul = el("ul"); for (const n of S.sum.notes) ul.append(el("li", "", n));
+  b.append(ul, el("p", "", "Harsh test profile: " + S.sum.shift_description + "."));
+  const m = S.sum.metrics, t = el("table");
+  for (const [k, a, c] of [["", "Calibrated model", "IoU baseline"], ["Auto-accept precision", pct(m.model.auto_precision), pct(m.baseline.auto_precision)],
+      ["Auto-accept recall", pct(m.model.auto_recall), pct(m.baseline.auto_recall)], ["Auto-accept F1", pct(m.model.auto_f1), pct(m.baseline.auto_f1)],
+      ["Parcels needing no review", pct(m.model.auto_resolved_share), pct(m.baseline.auto_resolved_share)]]) {
+    const tr = el("tr"); tr.append(el("td", "", k), el("td", "", a), el("td", "", c)); t.append(tr);
+  }
+  b.append(t, el("p", "hint", "Source: " + S.sum.source + ". Metrics are out-of-fold on the harsh profile."));
+}
+
+/* ---------- boot ---------- */
+async function init() {
+  try {
+    const [sum, layers, pairs, log] = await Promise.all([j("/api/summary?" + Q), j("/api/layers?" + Q), j("/api/pairs?" + Q), j("/api/decisions?" + Q)]);
+    Object.assign(S, { sum, layers, pairs, log });
+    for (const p of pairs) S.byKey.set(key(p.a, p.b), p);
+    for (const d of log) S.decisions.set(key(d.a_id, d.b_id), d);
+    buildMap(); renderLegend(); renderAbout(); renderKpis(); renderList(); refreshAudit();
+    const hash = decodeURIComponent(location.hash.slice(1));
+    const linked = hash && S.byKey.get(hash);
+    const first = itemsFor("review")[0];
+    if (linked) { setTab(S.decisions.has(hash) ? "decided" : linked.bucket === "review" ? "review" : "auto", false); selectPair(linked); }
+    else if (first) selectPair(first);
+    else $("detail").append(el("div", "empty", "Select a parcel on the map or a tab on the left."));
+  } catch (e) {
+    $("detail").textContent = ""; $("detail").append(el("div", "empty", "Could not load data. Run scripts/build_demo.py, then scripts/serve.py. (" + e.message + ")"));
+  }
+}
+$("truthToggle").addEventListener("change", async (e) => {
+  S.showTruth = e.target.checked; if (S.showTruth && !S.truth) S.truth = await j("/api/truth?" + Q);
+  if (S.sel) renderPairDetail(S.sel); else if (S.selUnmatched) selectUnmatched(S.selUnmatched);
+});
+$("aboutBtn").addEventListener("click", () => $("about").showModal());
+$("aboutClose").addEventListener("click", () => $("about").close());
+document.addEventListener("keydown", (e) => {
+  if (/^(TEXTAREA|INPUT)$/.test((e.target.tagName || "")) || e.repeat) return;
+  const items = itemsFor(S.tab), idx = items.findIndex((x) => S.sel && x.a === S.sel.a && x.b === S.sel.b);
+  if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); const n = items[Math.min(idx + 1, items.length - 1)]; if (n) pick(n); }
+  else if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); const n = items[Math.max(idx - 1, 0)]; if (n) pick(n); }
+  else if (S.sel && !S.decisions.has(key(S.sel.a, S.sel.b)) && (e.key === "a" || e.key === "A")) decide(S.sel, "accept");
+  else if (S.sel && !S.decisions.has(key(S.sel.a, S.sel.b)) && (e.key === "r" || e.key === "R")) decide(S.sel, "reject");
+});
+ME.then((me) => {
+  S.me = me; datasetSwitch($("dsw"), DS);
+  if (!me.can.truth) $("truthToggle").parentElement.remove();
+  else if (DS === "real") $("truthToggle").parentElement.lastChild.textContent = " Show hand checks";
+  init();
+});
+</script>
+</body>
+</html>

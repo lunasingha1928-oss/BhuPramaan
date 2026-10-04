@@ -1,0 +1,224 @@
+{
+  "source": "real:ward.geojson",
+  "n_cadastral": 1356,
+  "n_revenue": 1409,
+  "n_candidates": 14388,
+  "folds": 4,
+  "target_auto_precision": 0.99,
+  "thresholds": {
+    "reject_below": 0.5,
+    "accept_at_or_above": 0.6702381074428558,
+    "per_fold": [
+      {
+        "reject_below": 0.5,
+        "accept_at_or_above": 0.6666666865348816
+      },
+      {
+        "reject_below": 0.5,
+        "accept_at_or_above": 0.5
+      },
+      {
+        "reject_below": 0.5,
+        "accept_at_or_above": 0.7142857313156128
+      },
+      {
+        "reject_below": 0.5,
+        "accept_at_or_above": 0.800000011920929
+      }
+    ]
+  },
+  "n_auto_pairs": 1362,
+  "n_review_pairs": 13,
+  "n_review_parcels": 13,
+  "n_auto_parcels": 1193,
+  "n_unmatched_parcels": 150,
+  "metrics": {
+    "model": {
+      "n_test_parcels": 1356,
+      "n_true_links": 1398,
+      "auto_precision": 0.9816446402349486,
+      "auto_recall": 0.9563662374821174,
+      "assisted_recall": 0.9628040057224606,
+      "auto_f1": 0.9688405797101449,
+      "review_load": 0.009587020648967551,
+      "auto_resolved_share": 0.9904129793510325,
+      "per_type": {
+        "clean": {
+          "n": 391,
+          "auto_recall": 1.0,
+          "assisted_recall": 1.0
+        },
+        "offset": {
+          "n": 311,
+          "auto_recall": 0.8167202572347267,
+          "assisted_recall": 0.8456591639871383
+        },
+        "scale": {
+          "n": 168,
+          "auto_recall": 0.9880952380952381,
+          "assisted_recall": 0.9880952380952381
+        },
+        "rotate": {
+          "n": 112,
+          "auto_recall": 1.0,
+          "assisted_recall": 1.0
+        },
+        "split": {
+          "n": 302,
+          "auto_recall": 1.0,
+          "assisted_recall": 1.0
+        },
+        "merge": {
+          "n": 114,
+          "auto_recall": 0.9824561403508771,
+          "assisted_recall": 0.9824561403508771
+        }
+      },
+      "missing_false_link_rate": 0.045871559633027525,
+      "spurious_false_link_rate": 0.058823529411764705
+    },
+    "baseline": {
+      "n_test_parcels": 1356,
+      "n_true_links": 1398,
+      "auto_precision": 0.9875156054931336,
+      "auto_recall": 0.5658082975679543,
+      "assisted_recall": 0.7775393419170243,
+      "auto_f1": 0.7194179172351068,
+      "review_load": 0.2713864306784661,
+      "auto_resolved_share": 0.7286135693215339,
+      "per_type": {
+        "clean": {
+          "n": 391,
+          "auto_recall": 1.0,
+          "assisted_recall": 1.0
+        },
+        "offset": {
+          "n": 311,
+          "auto_recall": 0.0,
+          "assisted_recall": 0.04501607717041801
+        },
+        "scale": {
+          "n": 168,
+          "auto_recall": 0.8273809523809523,
+          "assisted_recall": 1.0
+        },
+        "rotate": {
+          "n": 112,
+          "auto_recall": 0.7678571428571429,
+          "assisted_recall": 0.9910714285714286
+        },
+        "split": {
+          "n": 302,
+          "auto_recall": 0.5,
+          "assisted_recall": 1.0
+        },
+        "merge": {
+          "n": 114,
+          "auto_recall": 0.21052631578947367,
+          "assisted_recall": 0.8859649122807017
+        }
+      },
+      "missing_false_link_rate": 0.0,
+      "spurious_false_link_rate": 0.0
+    }
+  },
+  "calibration": [
+    {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 12980,
+      "mean_pred": 5.669123311236035e-06,
+      "observed": 0.0028505392912172574
+    },
+    {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 23,
+      "mean_pred": 0.15986530482769012,
+      "observed": 0.43478260869565216
+    },
+    {
+      "lo": 0.2,
+      "hi": 0.30000000000000004,
+      "n": 7,
+      "mean_pred": 0.20789150893688202,
+      "observed": 0.42857142857142855
+    },
+    {
+      "lo": 0.30000000000000004,
+      "hi": 0.4,
+      "n": 2,
+      "mean_pred": 0.37862539291381836,
+      "observed": 0.5
+    },
+    {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 1,
+      "mean_pred": 0.4515891969203949,
+      "observed": 1.0
+    },
+    {
+      "lo": 0.5,
+      "hi": 0.6000000000000001,
+      "n": 12,
+      "mean_pred": 0.5499716997146606,
+      "observed": 0.75
+    },
+    {
+      "lo": 0.6000000000000001,
+      "hi": 0.7000000000000001,
+      "n": 18,
+      "mean_pred": 0.6642433404922485,
+      "observed": 0.6666666666666666
+    },
+    {
+      "lo": 0.7000000000000001,
+      "hi": 0.8,
+      "n": 8,
+      "mean_pred": 0.733997106552124,
+      "observed": 0.625
+    },
+    {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 65,
+      "mean_pred": 0.8605191111564636,
+      "observed": 0.9230769230769231
+    },
+    {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 1272,
+      "mean_pred": 0.9982943534851074,
+      "observed": 0.9905660377358491
+    }
+  ],
+  "shift_description": "offsets 10-25 m, rotations 15-40 deg, area x0.4-0.7 or x1.4-2.0, about twice the split and merge share of the training profile",
+  "notes": [
+    "Footprints are real; injected errors and owner names are synthetic.",
+    "Every pair was scored by a model that never saw that part of the map (out-of-fold).",
+    "The case shown uses a harsher error profile than the model was trained on.",
+    "Owner-name similarity is shown to the officer but is not part of the score.",
+    "Attribute values (owners, areas, land use, tax records) and the later survey are synthetic, with known injected conflicts and changes."
+  ],
+  "modules": {
+    "topology_errors": {
+      "revenue_before": 467,
+      "revenue_after": 7
+    },
+    "schema_correct": "9/9",
+    "units": "cent, square foot",
+    "conflict_recall": 0.9324463696369637,
+    "conflict_precision": 0.9212322695035461,
+    "change_recall": 0.9835390946502057,
+    "change_precision": 0.9582321515298688,
+    "confidence_high_share": 0.8303834808259587,
+    "sources": 3,
+    "crs_handled": [
+      "EPSG:32644",
+      "EPSG:4326",
+      "EPSG:7755"
+    ]
+  }
+}

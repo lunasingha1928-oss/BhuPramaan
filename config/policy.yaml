@@ -1,0 +1,52 @@
+# Policy-as-configuration: a department can retune these without touching code.
+seed: 7
+
+candidates:
+  search_radius_m: 30.0        # candidate pairs must lie within this distance
+
+baseline:                       # classic IoU-threshold matcher (the comparison point)
+  accept_iou: 0.50
+  review_iou: 0.20
+
+ml:
+  target_auto_precision: 0.99   # auto-accepted links must be >= this precise on the calibration set
+  max_missed_true_pairs: 0.01   # auto-reject threshold: lose at most this share of true pairs
+  block_size_m: 150.0           # spatial block size for train/calib/test split (no neighbour leakage)
+  block_fractions: [0.5, 0.2, 0.3]   # train / calibration / test
+
+benchmark:                      # injected-error mix applied to real footprints
+  error_mix:
+    clean: 0.38
+    offset: 0.16
+    scale: 0.10
+    rotate: 0.06
+    split: 0.08
+    merge: 0.06
+    missing: 0.08
+    # remainder to 1.0 is normalised automatically
+  spurious_fraction: 0.05       # extra revenue-layer parcels with no cadastral counterpart
+  name_variant_rate: 0.35       # share of revenue-layer owners spelled differently
+
+topology:
+  overlap_min_m2: 0.5           # overlaps smaller than this are ignored as digitising noise
+  sliver_max_m2: 2.0            # polygons or fragments smaller than this are slivers
+  sliver_thinness: 0.08         # Polsby-Popper compactness below this is a sliver
+  gap_max_m: 0.3                # parcels closer than this without touching are flagged
+  defect_rate: 0.03             # share of revenue parcels given digitisation faults in the demo
+
+integration:
+  area_tolerance: 0.15          # recorded vs surveyed area difference that counts as a conflict
+  owner_similarity_min: 0.80    # owner names below this similarity are a conflict
+  source_reliability: {cadastral: 0.97, revenue: 0.92, municipal_tax: 0.85}
+  corroboration_bonus: 0.02     # a matching municipal-tax record
+  topology_factor: {clean: 1.0, repaired: 0.9, unresolved: 0.6}
+  attribute_penalty: 0.10       # per attribute conflict
+  attribute_floor: 0.60
+  bands: {high: 85, medium: 60}
+
+changes:
+  altered_area_ratio: 0.80      # matched footprints whose smaller/larger area ratio is below this are altered
+
+real:
+  accept_min: 0.90              # on real, unseen data, auto-accept only at or above this probability
+  review_min: 0.30              # between review_min and the accept threshold a person decides

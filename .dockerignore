@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+results
+data
+tests
+demo/users.json
+demo/.secret
+demo/access.jsonl
+demo/uploads
+*.zip

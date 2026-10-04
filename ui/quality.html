@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data quality · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .confbar { height: 6px; background: #ece9e1; border-radius: 3px; overflow: hidden; width: 90px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .confbar i { display: block; height: 100%; background: var(--series-model); }
+  .ok { color: var(--good); font-weight: 600; } .no { color: var(--bad); font-weight: 600; }
+  .exports { display: flex; gap: 8px; flex-wrap: wrap; }
+  #conflictList { max-height: 420px; overflow: auto; }
+  .arrow { color: var(--faint); margin: 0 4px; }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>Data quality</h1>
+      <p>What happened to each source on the way into the harmonised layer: coordinate systems converted, topology repaired,
+         columns and units recognised, and where the departments disagree about a parcel.</p></div>
+    <div class="exports" id="exports"></div>
+  </div>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="grid g-12" style="margin-top:14px">
+    <div class="card s-7">
+      <h2>Topology: checked and repaired</h2>
+      <p class="sub">Counts before and after the automatic repair. Overlaps go to the better-supported parcel; the other is trimmed.</p>
+      <table class="data" id="topo"></table>
+      <div class="card-foot" id="topoFoot"></div>
+    </div>
+    <div class="card s-5">
+      <h2>Coordinate systems</h2>
+      <p class="sub">Each department delivered its data in a different coordinate system. All are converted to one working system.</p>
+      <table class="data" id="crs"></table>
+    </div>
+
+    <div class="card s-7">
+      <h2>Columns recognised automatically</h2>
+      <p class="sub">Each source's columns matched to a common schema, using the column name and what its values look like.</p>
+      <div id="schema"></div>
+    </div>
+    <div class="card s-5">
+      <h2>Area units detected</h2>
+      <p class="sub">Recorded areas compared with surveyed areas of the same parcels; the closest known unit wins.</p>
+      <table class="data" id="units"></table>
+      <div class="card-foot" id="joinFoot"></div>
+    </div>
+
+    <div class="card s-5">
+      <h2>Confidence of the harmonised layer</h2>
+      <p class="sub" id="confSub">0–100 per parcel.</p>
+      <div id="confChart"></div>
+      <div class="card-foot" id="confFoot"></div>
+    </div>
+    <div class="card s-7">
+      <h2>Where the departments disagree</h2>
+      <p class="sub">Attribute conflicts found per parcel, measured against the conflicts deliberately planted in the test data.</p>
+      <table class="data" id="cmetrics"></table>
+      <div style="display:flex;gap:8px;margin:14px 0 8px;flex-wrap:wrap">
+        <input type="search" id="cq" placeholder="Search parcel or text" aria-label="Search conflicts">
+        <select id="ctype" aria-label="Conflict type"><option value="">All types</option><option value="owner">Owner</option><option value="area">Area</option><option value="land_use">Land use</option></select>
+      </div>
+      <div id="conflictList"></div>
+    </div>
+  </div>
+</div>
+<script src="assets/common.js?v=9"></script>
+<script src="assets/charts.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("quality.html");
+const FIELD = { parcel_ref: "Record / assessment number", owner_name: "Owner name", area: "Area", land_use: "Land use", survey_no: "Survey number" };
+const TYPE = { owner: "Owner", area: "Area", land_use: "Land use" };
+let Q = null, USER = null;
+
+function tile(label, value, note) {
+  const d = el("div", "card tile"); d.append(el("div", "label", label), el("div", "value", value)); if (note) d.append(el("div", "note", note)); return d;
+}
+function exportBtn(name, label) { const a = el("a", "btn", label); a.href = "/api/export/" + name; return a; }
+
+function renderConflicts() {
+  const q = $("cq").value.trim().toLowerCase(), t = $("ctype").value;
+  const rows = Q.conflicts.list.filter((c) => (!t || c.type === t) && (!q || (c.parcel_id + " " + c.detail).toLowerCase().includes(q)));
+  const tb = el("table", "data");
+  const hr = el("tr"); for (const h of ["Parcel", "Type", "What disagrees"]) hr.append(el("th", "", h)); tb.append(hr);
+  for (const c of rows.slice(0, 300)) {
+    const tr = el("tr");
+    const td = el("td");
+    if (USER.pages.includes("map.html")) { const a = el("a", "mono", c.parcel_id); a.href = pageUrl("map.html#" + c.parcel_id); td.append(a); }
+    else td.append(el("span", "mono", c.parcel_id));
+    tr.append(td, el("td", "", TYPE[c.type] || c.type), el("td", "", c.detail)); tb.append(tr);
+  }
+  const box = $("conflictList"); box.textContent = ""; box.append(tb);
+  if (rows.length > 300) box.append(el("p", "hint", `Showing 300 of ${rows.length}. Download the CSV for all.`));
+}
+
+async function init(me) {
+  USER = me;
+  try {
+    Q = await j("/api/quality");
+    const t = Q.topology, rb = t.revenue.before, ra = t.revenue.after;
+    const errs = (r) => r.invalid + r.overlaps + r.slivers;
+    const sch = [...Q.schema.revenue, ...Q.schema.tax].filter((m) => m.field);
+    const cm = Q.conflicts.metrics;
+    const tiles = $("tiles");
+    tiles.append(
+      tile("Topology errors, revenue layer", `${errs(rb)} → ${errs(ra)}`, "invalid shapes, overlaps, slivers"),
+      tile("Coordinate systems handled", String(Q.crs.length), Q.crs.map((c) => c.delivered_crs).join(", ")),
+      tile("Columns recognised", `${sch.filter((m) => m.correct).length} / ${sch.length}`, "across revenue and tax records"),
+      tile("Units detected", `${Q.units.revenue.unit}, ${Q.units.tax.unit}`, "revenue extent, tax plinth area"),
+      tile("Parcels with a conflict", fmtInt(Q.conflicts.parcels_with_conflicts), "owner, area or land use"));
+
+    if (me.can.export) {
+      const ex = $("exports");
+      ex.append(exportBtn("harmonised.geojson", "Harmonised layer (GeoJSON)"), exportBtn("harmonised.csv", "Harmonised table (CSV)"),
+                exportBtn("conflicts.csv", "Conflicts (CSV)"));
+    }
+
+    // topology table
+    const tt = $("topo");
+    const hr = el("tr"); for (const h of ["Check", "Revenue: before", "after", "Cadastral: before", "after"]) hr.append(el("th", h === "Check" ? "" : "num", h)); tt.append(hr);
+    const cb = t.cadastral.before, ca = t.cadastral.after;
+    for (const [k, lab] of [["invalid", "Invalid / self-intersecting shapes"], ["overlaps", "Overlapping parcel pairs"], ["slivers", "Slivers"], ["near_miss_gaps", "Near-miss gaps (flagged, not snapped)"]]) {
+      const tr = el("tr"); tr.append(el("td", "", lab), el("td", "num", fmtInt(rb[k])), el("td", "num", fmtInt(ra[k])), el("td", "num", fmtInt(cb[k])), el("td", "num", fmtInt(ca[k]))); tt.append(tr);
+    }
+    const tr2 = el("tr"); tr2.append(el("td", "", "Overlapping area (m²)"), el("td", "num", fmtInt(Math.round(rb.overlap_area_m2))), el("td", "num", fmtInt(Math.round(ra.overlap_area_m2))),
+      el("td", "num", fmtInt(Math.round(cb.overlap_area_m2))), el("td", "num", fmtInt(Math.round(ca.overlap_area_m2)))); tt.append(tr2);
+    const acts = Object.entries(t.revenue.actions).map(([k, v]) => `${v} × ${k}`).join(", ");
+    $("topoFoot").textContent = `Revenue layer as received had ${t.revenue.defects_injected} simulated digitisation faults. Repairs: ${acts}. ` +
+      `What remains (one parcel inside another, thin fragments) is left for an officer rather than deleted.`;
+
+    // crs
+    const ct = $("crs");
+    const h2 = el("tr"); for (const h of ["Source", "Delivered in", "Round-trip error"]) h2.append(el("th", h === "Round-trip error" ? "num" : "", h)); ct.append(h2);
+    for (const c of Q.crs) {
+      const tr = el("tr"); const s = el("td"); s.append(document.createTextNode(c.source), el("div", "hint", `${c.features} features · ${c.file}`));
+      const d = el("td"); d.append(document.createTextNode(c.delivered_crs), el("div", "hint", c.delivered_crs_name));
+      tr.append(s, d, el("td", "num", c.round_trip_error_m < 0.001 ? "< 1 mm" : c.round_trip_error_m.toFixed(3) + " m")); ct.append(tr);
+    }
+    ct.append(el("caption", "hint", `Working system: ${Q.crs[0].working_crs} (${Q.crs[0].working_crs_name}).`));
+    ct.querySelector("caption").style.captionSide = "bottom"; ct.querySelector("caption").style.textAlign = "left"; ct.querySelector("caption").style.paddingTop = "8px";
+
+    // schema
+    for (const [src, label] of [["revenue", "Revenue records (EPSG:7755 layer)"], ["tax", "Municipal property-tax points"]]) {
+      $("schema").append(el("h3", "", label));
+      const tb = el("table", "data"); tb.style.marginBottom = "14px";
+      const h = el("tr"); for (const x of ["Column as delivered", "Recognised as", "Confidence", ""]) h.append(el("th", "", x)); tb.append(h);
+      for (const m of Q.schema[src]) {
+        const tr = el("tr"); const conf = el("td"); const bar = el("span", "confbar"); const i = el("i"); i.style.width = pct(m.confidence, 0); bar.append(i);
+        conf.append(bar, document.createTextNode(pct(m.confidence, 0)));
+        tr.append(el("td", "mono", m.column), el("td", "", m.field ? FIELD[m.field] : "not mapped"), conf,
+                  el("td", m.correct ? "ok" : "no", m.field ? (m.correct ? "✓ correct" : "✗ wrong") : ""));
+        tb.append(tr);
+      }
+      $("schema").append(tb);
+    }
+
+    // units
+    const ut = $("units");
+    const h3 = el("tr"); for (const x of ["Column", "Detected unit", "m² per unit (observed / exact)", "Parcels used"]) h3.append(el("th", x.startsWith("Parcels") ? "num" : "", x)); ut.append(h3);
+    for (const [src, label] of [["revenue", "Revenue"], ["tax", "Tax"]]) {
+      const u = Q.units[src]; const tr = el("tr");
+      const unit = el("td"); unit.append(document.createTextNode(u.unit + " "), el("span", u.unit === u.truth ? "ok" : "no", u.unit === u.truth ? "✓" : "✗"));
+      tr.append(el("td", "mono", `${label}: ${u.column}`), unit, el("td", "", `${u.m2_per_unit_observed} / ${u.m2_per_unit_expected}`), el("td", "num", fmtInt(u.parcels_used)));
+      ut.append(tr);
+    }
+    $("joinFoot").textContent = `Tax points linked to parcels by location: ${fmtInt(Q.tax_join.joined)} of ${fmtInt(Q.tax_join.points)}, ${pct(Q.tax_join.correct_share)} to the right parcel.`;
+
+    // confidence histogram as bars
+    const bins = Q.confidence.histogram.map((v, i) => ({ v, i }));
+    barsGrouped($("confChart"), {
+      title: "Confidence distribution", categories: bins.map((b) => `${b.i * 10}–${b.i * 10 + 10}`),
+      series: [{ name: "Parcels", color: "var(--series-model)", values: bins.map((b) => b.v) }],
+      max: Math.max(...bins.map((b) => b.v)), format: (v) => fmtInt(Math.round(v)), labelWidth: 70,
+    });
+    const bands = Q.confidence.bands;
+    $("confSub").textContent = `0–100 per parcel. High ${fmtInt(bands.High || 0)}, Medium ${fmtInt(bands.Medium || 0)}, Low ${fmtInt(bands.Low || 0)} (Low includes parcels with no revenue counterpart).`;
+    $("confFoot").textContent = "Score = " + Q.confidence.formula + ". Weights are in config/policy.yaml.";
+
+    // conflict metrics
+    const mt = $("cmetrics");
+    const h4 = el("tr"); for (const x of ["Conflict type", "Planted", "Flagged", "Precision", "Recall"]) h4.append(el("th", x === "Conflict type" ? "" : "num", x)); mt.append(h4);
+    for (const [k, v] of Object.entries(cm)) {
+      const tr = el("tr"); tr.append(el("td", "", TYPE[k]), el("td", "num", fmtInt(v.injected)), el("td", "num", fmtInt(v.flagged)), el("td", "num", pct(v.precision)), el("td", "num", pct(v.recall))); mt.append(tr);
+    }
+    renderConflicts();
+  } catch (e) { fatal($("page"), e); }
+}
+for (const id of ["cq", "ctype"]) $(id).addEventListener("input", renderConflicts);
+ME.then(init);
+</script>
+</body>
+</html>

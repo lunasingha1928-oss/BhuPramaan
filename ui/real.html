@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real data · Parcel Reconciliation</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="assets/app.css?v=9">
+<style>
+  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  #mapwrap { position: relative; height: 560px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+  #map { position: absolute; inset: 0; background: #ece9e0; }
+  .layers { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin-bottom: 10px; }
+  .layers label { display: inline-flex; gap: 6px; align-items: center; }
+  .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+  .labelbox .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .progress { height: 6px; background: #ece9e1; border-radius: 3px; overflow: hidden; margin: 8px 0; }
+  .progress i { display: block; height: 100%; background: var(--accent); }
+  .rule { margin-top: 12px; font-size: 12.5px; line-height: 1.5; background: #f6f4ee; border-radius: 8px; padding: 10px 12px; color: var(--ink); }
+  kbd { font: 11px ui-monospace, monospace; background: #f0eee8; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+  .big { font-size: 30px; font-weight: 650; }
+</style>
+</head>
+<body>
+<header id="topbar"></header>
+<div class="page" id="page">
+  <div class="page-head">
+    <div><h1>Real data: three independent building maps</h1>
+      <p>OpenStreetMap, Microsoft and Google each mapped the same buildings independently, and they disagree. Nothing here is planted.
+         Accuracy comes only from pairs people have checked by hand against satellite imagery.</p></div>
+  </div>
+  <div class="tiles" id="tiles"></div>
+
+  <div class="grid g-12" style="margin-top:14px">
+    <div class="card s-8">
+      <h2>Map</h2>
+      <div class="layers" id="layerCtl"></div>
+      <div id="mapwrap"><div id="map"></div></div>
+      <p class="hint" style="margin-top:8px">Satellite imagery: Esri World Imagery (needs internet). Without internet the outlines still show.</p>
+    </div>
+    <div class="card s-4 labelbox" id="labelCard">
+      <h2>Check pairs by hand</h2>
+      <p class="sub">Is the blue outline (OSM) the same building as the orange one? The model's answer is hidden so your check stays independent.</p>
+      <div id="labelBody">Loading…</div>
+    </div>
+
+    <div class="card s-6">
+      <h2>Accuracy on real data</h2>
+      <p class="sub" id="evalSub">From the hand-checked pairs, weighted back to the full set of candidate pairs.</p>
+      <div id="eval"></div>
+    </div>
+    <div class="card s-6">
+      <h2>How the sources disagree</h2>
+      <p class="sub">Descriptions of real disagreement, not accuracy figures.</p>
+      <div id="compare"></div>
+      <h3 style="margin-top:16px">OSM buildings confirmed by other sources</h3>
+      <div id="consensus"></div>
+    </div>
+
+    <div class="card s-12">
+      <h2>Possible encroachment on road space</h2>
+      <p class="sub" id="encSub">Buildings overlapping the estimated road reserve. Candidates for a field check, not findings.</p>
+      <div id="enc" style="max-height:320px;overflow:auto"></div>
+    </div>
+  </div>
+</div>
+<script src="vendor/leaflet.js"></script>
+<script src="assets/common.js?v=9"></script>
+<script src="assets/charts.js?v=9"></script>
+<script>
+"use strict";
+const ME = renderNav("real.html");
+const SRC = { OSM: { color: "#2a78d6", dash: null }, Microsoft: { color: "#eb6834", dash: "5 3" }, Google: { color: "#1baf7a", dash: "2 3" } };
+const R = { map: null, layers: {}, idx: {}, hi: null, me: null, cur: null, busy: false };
+
+function tile(label, value, note) { const d = el("div", "card tile"); d.append(el("div", "label", label), el("div", "value", value)); if (note) d.append(el("div", "note", note)); return d; }
+
+function initMap(layers) {
+  const map = L.map("map", { preferCanvas: true, zoomSnap: 0.25, attributionControl: true });
+  R.map = map;
+  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 20, maxNativeZoom: 19, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }).addTo(map);
+  const ctl = $("layerCtl");
+  const addToggle = (name, layer, color, dash, on) => {
+    const lab = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.checked = on;
+    const sw = el("span", "sw"); sw.style.border = `2px ${dash ? "dashed" : "solid"} ${color}`;
+    lab.append(cb, sw, document.createTextNode(name)); ctl.append(lab);
+    cb.addEventListener("change", () => (cb.checked ? layer.addTo(map) : map.removeLayer(layer)));
+    if (on) layer.addTo(map);
+  };
+  if (layers.road_reserve) {
+    const rr = L.geoJSON(layers.road_reserve, { interactive: false, style: { color: "#6f6d66", weight: 0, fillColor: "#ffffff", fillOpacity: 0.25 } });
+    addToggle("Road reserve (estimated)", rr, "#9a988f", false, false);
+  }
+  const shown = {};
+  const mk = (data, k) => L.geoJSON(data, { style: () => ({ color: SRC[k].color, weight: 1.5, dashArray: SRC[k].dash, fillOpacity: 0.05 }) });
+  for (const k of ["OSM", "Microsoft", "Google"]) {
+    if (!layers[k]) continue;
+    R.idx[k] = new Map(layers[k].features.map((f) => [f.properties.id, f]));
+    const raw = mk(layers[k], k), fixed = layers[k + "_aligned"] ? mk(layers[k + "_aligned"], k) : raw;
+    // one group per source; its content swaps between raw and offset-corrected outlines
+    const grp = L.featureGroup([raw]);
+    shown[k] = { grp, raw, fixed };
+    addToggle(k, grp, SRC[k].color, SRC[k].dash, k !== "Google");
+    R.layers[k] = grp;
+  }
+  addToggle("Satellite", sat, "#888", false, true);
+  if (Object.values(shown).some((s) => s.fixed !== s.raw)) {
+    const lab = el("label"); const cb = el("input"); cb.type = "checkbox";
+    lab.append(cb, document.createTextNode(" Remove map offset (co-registration)")); lab.style.fontWeight = "600"; ctl.append(lab);
+    const swap = () => { for (const s of Object.values(shown)) { s.grp.clearLayers(); s.grp.addLayer(cb.checked ? s.fixed : s.raw); } };
+    cb.addEventListener("change", swap);
+    cb.checked = true; swap();          // open with the offset removed; untick to show the raw maps
+  }
+  map.fitBounds(R.layers.OSM.getBounds());
+}
+
+function highlight(ga, gb, gbRaw) {
+  if (R.hi) R.map.removeLayer(R.hi);
+  const parts = [
+    L.geoJSON(ga, { style: { color: "#2a78d6", weight: 3, fillOpacity: 0.1 } }),
+    L.geoJSON(gb, { style: { color: "#eb6834", weight: 3, dashArray: "6 4", fillOpacity: 0.1 } }),
+  ];
+  if (gbRaw && R.showRaw) parts.push(L.geoJSON(gbRaw, { style: { color: "#eb6834", weight: 1.2, dashArray: "2 4", fillOpacity: 0, opacity: 0.8 } }));
+  R.hi = L.featureGroup(parts).addTo(R.map);
+  R.map.fitBounds(R.hi.getBounds().pad(1.8), { maxZoom: 20 });
+}
+
+async function nextPair() {
+  const box = $("labelBody"); box.textContent = "";
+  if (!R.me.can.label) { box.append(el("p", "hint", "Your role views the results; officers and supervisors do the checking.")); return; }
+  const n = await j("/api/real/next");
+  const prog = el("div", "progress"); const i = el("i"); i.style.width = pct(n.labelled_by_you / n.total, 0); prog.append(i);
+  box.append(el("div", "hint", `You have checked ${n.labelled_by_you} of ${n.total} pairs.`), prog);
+  if (n.done) { box.append(el("p", "", "All sampled pairs checked. Thank you.")); return; }
+  R.cur = n.pair;
+  const aligned = n.pair.geom_b_aligned;
+  highlight(n.pair.geom_a, aligned || n.pair.geom_b, aligned ? n.pair.geom_b : null);
+  box.append(el("p", "", `Pair ${n.pair.pair_id.replace("|", " ↔ ")}: blue = ${n.pair.src_a}, orange = ${n.pair.src_b}` +
+    (aligned ? " (moved to remove the map offset)." : ".")));
+  const row = el("div", "actions");
+  for (const [lab, val, k, cls] of [["Same building", "same", "S", "btn primary"], ["Different", "different", "D", "btn danger"], ["Can't tell", "unsure", "U", "btn"]]) {
+    const b = el("button", cls); b.append(document.createTextNode(lab + " "), el("kbd", "", k));
+    b.addEventListener("click", () => label(val)); b.disabled = true; row.append(b);
+  }
+  // buttons (and keys) unlock after a short look; the server refuses faster labels anyway
+  R.readyAt = Date.now() + (n.min_seconds || 3) * 1000;
+  setTimeout(() => row.querySelectorAll("button").forEach((x) => (x.disabled = false)), (n.min_seconds || 3) * 1000);
+  const rule = el("div", "rule");
+  rule.append(el("b", "", "Same building"), document.createTextNode(" = both outlines describe the same structure, even if one is shifted, bigger, smaller or a slightly different shape. "),
+    el("b", "", "Different"), document.createTextNode(" = they are two separate structures (for example, the orange outline is really the neighbouring building). "),
+    el("b", "", "Can't tell"), document.createTextNode(" = the imagery doesn't settle it."));
+  const raw = el("label", "hint"); const cb = el("input"); cb.type = "checkbox"; cb.checked = !!R.showRaw;
+  cb.addEventListener("change", () => { R.showRaw = cb.checked; highlight(n.pair.geom_a, aligned || n.pair.geom_b, aligned ? n.pair.geom_b : null); });
+  raw.append(cb, document.createTextNode(" also show the orange outline at its original position"));
+  box.append(row, rule, aligned ? raw : document.createTextNode(""));
+}
+
+async function label(val) {
+  if (!R.cur || R.busy || Date.now() < (R.readyAt || 0)) return;
+  R.busy = true;
+  try {
+    await j("/api/real/labels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pair_id: R.cur.pair_id, label: val }) });
+    await nextPair(); await renderEval();
+  } catch (e) { $("labelBody").append(el("p", "hint", e.message)); }
+  finally { R.busy = false; }
+}
+
+async function renderEval() {
+  const ev = await j("/api/real/eval");
+  const box = $("eval"); box.textContent = "";
+  $("evalSub").textContent = `${ev.labelled} pairs checked by hand (${ev.unsure} marked can't tell), weighted back to all candidate pairs.` +
+    (ev.median_seconds ? ` Median ${ev.median_seconds.toFixed(0)} s per pair.` : "");
+  if (ev.labelled < 30) {
+    box.append(el("div", "empty", `Accuracy appears after 30 checked pairs (${ev.labelled} so far). Aim for all ${ev.sample_size}.`));
+    return;
+  }
+  const t = el("table", "data");
+  const hr = el("tr"); for (const h of ["Rule", "Precision (95% range)", "Recall", "Pairs predicted"]) hr.append(el("th", h === "Rule" ? "" : "num", h)); t.append(hr);
+  const fmt = (x) => (x == null ? "—" : pct(x));
+  const rowsEv = [["Model, auto-accept", ev.model], ["Model, accept or review", ev.model_or_review],
+                  ["Plain IoU matching", ev.iou_baseline], ["Model or IoU (combined)", ev.combined]];
+  if (ev.iou_no_coreg) rowsEv.push(["IoU without co-registration", ev.iou_no_coreg]);
+  for (const [name, m] of rowsEv.filter(([, m]) => m)) {
+    const tr = el("tr"); const nm = el("td"); nm.append(document.createTextNode(name), el("div", "hint", m.rule));
+    const ci = m.precision_ci && m.precision_ci[0] != null ? ` (${pct(m.precision_ci[0], 0)}–${pct(m.precision_ci[1], 0)})` : "";
+    tr.append(nm, el("td", "num", fmt(m.precision) + ci), el("td", "num", fmt(m.recall)), el("td", "num", String(m.n_predicted))); t.append(tr);
+  }
+  box.append(t);
+  const t2 = el("table", "data"); t2.style.marginTop = "14px";
+  const h2 = el("tr"); for (const h of ["Model probability", "Checked", "Model said (mean)", "Actually same"]) h2.append(el("th", h === "Model probability" ? "" : "num", h)); t2.append(h2);
+  for (const s of ev.by_stratum) {
+    const tr = el("tr"); tr.append(el("td", "", `${pct(s.lo, 0)}–${pct(s.hi, 0)}`), el("td", "num", String(s.labelled)),
+      el("td", "num", s.mean_p == null ? "—" : pct(s.mean_p, 0)), el("td", "num", s.share_same == null ? "—" : pct(s.share_same, 0))); t2.append(tr);
+  }
+  box.append(el("h3", "", "Is the confidence honest on real data?"), t2,
+    el("p", "hint", ev.note + (ev.double_labelled ? ` ${ev.double_labelled} pairs checked by two people; they agreed on ${pct(ev.agreement, 0)}.` : "")));
+}
+
+async function init(me) {
+  R.me = me;
+  try {
+    const [sum, layers] = await Promise.all([j("/api/real/summary"), j("/api/real/layers")]);
+    const om = sum.comparisons.find((c) => c.pair === "OSM ↔ Microsoft") || sum.comparisons[0];
+    const two = sum.encroachment.filter((e) => e.confirmed_by_two_sources).length;
+    $("tiles").append(
+      tile("Buildings mapped", Object.entries(sum.sources).map(([k, v]) => `${fmtInt(v)}`).join(" / "), Object.keys(sum.sources).join(" / ")),
+      tile("OSM buildings found in Microsoft", pct(om.a_with_counterpart, 0), `${fmtInt(om.a_only)} OSM-only`),
+      tile("Microsoft buildings missing in OSM", fmtInt(om.b_only), "candidates to add to the map"),
+      (() => { const cr = (sum.coregistration || {})["OSM ↔ Microsoft"];
+        return cr && cr.applied
+          ? tile("Map offset removed", `${cr.anchor_offset_median_m.before.toFixed(1)} → ${cr.anchor_offset_median_m.after.toFixed(1)} m`,
+                 `local shift ${cr.shift_magnitude_m.min.toFixed(1)}–${cr.shift_magnitude_m.max.toFixed(1)} m, from ${fmtInt(cr.anchors)} anchor buildings`)
+          : tile("Typical offset between maps", om.median_offset_m == null ? "—" : om.median_offset_m.toFixed(1) + " m", ""); })(),
+      tile("Road-space encroachment", fmtInt(sum.encroachment.length), `OSM buildings; ${two} confirmed by another source`));
+    initMap(layers);
+    const ct = el("table", "data");
+    const hr = el("tr"); for (const h of ["Sources", "Linked automatically", "Sent to review", "Part of a larger shape", "Only in first", "Only in second", "Median IoU"]) hr.append(el("th", h === "Sources" ? "" : "num", h)); ct.append(hr);
+    for (const c of sum.comparisons) {
+      const tr = el("tr"); tr.append(el("td", "", c.pair), el("td", "num", fmtInt(c.auto_links)), el("td", "num", fmtInt(c.review_links)),
+        el("td", "num", fmtInt((c.a_inside_larger_b || 0) + (c.b_inside_larger_a || 0))),
+        el("td", "num", fmtInt(c.a_only)), el("td", "num", fmtInt(c.b_only)),
+        el("td", "num", c.median_iou == null ? "—" : c.median_iou.toFixed(2))); ct.append(tr);
+    }
+    const scroll = el("div"); scroll.style.overflowX = "auto"; scroll.append(ct);
+    $("compare").append(scroll, el("p", "hint", "Each pair of sources is co-registered first (a local shift field removes the few-metre offset between maps). " +
+      "\"Part of a larger shape\": one source traced a terrace or block as one polygon, the other as several buildings, so the link is one-to-many."));
+    const cs = sum.consensus_osm, total = Object.values(cs).reduce((a, b) => a + b, 0);
+    const segs = Object.entries(cs).map(([k, v]) => ({ label: k === "1" ? "Only OSM" : `Seen by ${k} sources`, value: v,
+      color: k === "1" ? "#9a988f" : k === "2" ? "#86b6ef" : "#2a78d6" }));
+    stack100($("consensus"), segs);
+    const eo = sum.encroachment_other_sources || {};
+    $("encSub").textContent = `${sum.encroachment.length} OSM buildings overlap the estimated road reserve by more than 5 m² and 10% of their area` +
+      (Object.keys(eo).length ? ` (after co-registration, other sources show ${Object.entries(eo).map(([k, v]) => `${k} ${v}`).join(", ")}). ` : ". ") +
+      "Road widths are estimated from OSM road class and width tags, so these are candidates for a field check, not findings.";
+    const et = el("table", "data");
+    const h3 = el("tr"); for (const h of ["Source", "Building", "Overlap", "Share of building", "Two sources agree"]) h3.append(el("th", ["Overlap", "Share of building"].includes(h) ? "num" : "", h)); et.append(h3);
+    for (const e of sum.encroachment.sort((a, b) => b.overlap_m2 - a.overlap_m2).slice(0, 200)) {
+      const tr = el("tr"); tr.style.cursor = "pointer";
+      tr.append(el("td", "", e.source), el("td", "mono", e.id), el("td", "num", e.overlap_m2 + " m²"), el("td", "num", pct(e.share, 0)), el("td", "", e.confirmed_by_two_sources ? "Yes" : ""));
+      tr.addEventListener("click", () => { const f = R.idx[e.source] && R.idx[e.source].get(e.id); if (f) { if (R.hi) R.map.removeLayer(R.hi); R.hi = L.geoJSON(f, { style: { color: "#d03b3b", weight: 3 } }).addTo(R.map); R.map.fitBounds(R.hi.getBounds().pad(3), { maxZoom: 20 }); $("mapwrap").scrollIntoView({ behavior: "smooth", block: "center" }); } });
+      et.append(tr);
+    }
+    if (!sum.encroachment.length) $("enc").append(el("div", "empty", "No road data, or no overlaps found."));
+    else $("enc").append(et);
+    await Promise.all([nextPair(), renderEval()]);
+  } catch (e) { fatal($("page"), e); }
+}
+document.addEventListener("keydown", (e) => {
+  if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName) || e.repeat) return;
+  const k = e.key.toLowerCase();
+  if (k === "s") label("same"); else if (k === "d") label("different"); else if (k === "u") label("unsure");
+});
+ME.then(init);
+</script>
+</body>
+</html>
