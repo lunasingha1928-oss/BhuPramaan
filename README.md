@@ -221,5 +221,3 @@ Dockerfile, docker-compose.yml
   CC BY 4.0 / ODbL; the temporal layer contains modified Copernicus Sentinel-2 data.
 - Satellite basemap: Esri World Imagery (Esri, Maxar, Earthstar Geographics), loaded live in the browser, not redistributed.
 - Map library: [Leaflet](https://leafletjs.com/) (BSD-2).
-#   B h u P r a m a a n  
- 
